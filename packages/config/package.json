@@ -1,0 +1,48 @@
+{
+  "name": "@template/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tsconfig/base": "./tsconfig/tsconfig.base.json",
+    "./tsconfig/next": "./tsconfig/tsconfig.next.json",
+    "./tsconfig/node": "./tsconfig/tsconfig.node.json",
+    "./tsconfig/react": "./tsconfig/tsconfig.react.json",
+    "./eslint/base": "./eslint/base.js",
+    "./eslint/next": "./eslint/next.js",
+    "./eslint/node": "./eslint/node.js",
+    "./eslint/react": "./eslint/react.js",
+    "./prettier": "./prettier/prettier.config.js",
+    "./tailwind": "./tailwind/preset.ts"
+  },
+  "files": [
+    "tsconfig",
+    "eslint",
+    "prettier",
+    "tailwind"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.13.0",
+    "@typescript-eslint/eslint-plugin": "^8.10.0",
+    "@typescript-eslint/parser": "^8.10.0",
+    "eslint": "^9.13.0",
+    "eslint-config-next": "^15.0.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-react": "^7.37.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "globals": "^15.11.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.10.0"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.6.0"
+  }
+}
