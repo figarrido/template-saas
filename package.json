@@ -1,0 +1,39 @@
+{
+  "name": "template-saas",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "setup": "tsx scripts/setup.ts",
+    "dev": "turbo run dev",
+    "dev:webhooks": "stripe listen --forward-to localhost:3000/api/webhooks/billing/stripe",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:rls": "turbo run test:rls",
+    "test:e2e": "turbo run test:e2e",
+    "db:reset": "supabase db reset",
+    "db:types": "turbo run db:types",
+    "db:types:check": "turbo run db:types:check",
+    "db:introspect": "turbo run db:introspect",
+    "db:introspect:check": "turbo run db:introspect:check",
+    "env:example": "turbo run env:example",
+    "env:example:check": "turbo run env:example:check",
+    "jobs:codegen": "turbo run jobs:codegen",
+    "jobs:codegen:check": "turbo run jobs:codegen:check",
+    "supabase:promote-pr": "tsx scripts/promote-pr.ts",
+    "changeset": "changeset",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.0",
+    "prettier": "^3.3.0",
+    "tsx": "^4.19.0",
+    "turbo": "^2.5.0",
+    "typescript": "^5.6.0"
+  }
+}

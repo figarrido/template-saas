@@ -1,0 +1,72 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [
+    ".env",
+    "**/.env.local",
+    "**/.env.example"
+  ],
+  "globalEnv": [
+    "NODE_ENV",
+    "RELEASE"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"]
+    },
+    "test:rls": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "outputs": []
+    },
+    "test:e2e": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "outputs": ["playwright-report/**"]
+    },
+    "db:types": {
+      "cache": false,
+      "outputs": ["src/types/database.types.ts"]
+    },
+    "db:types:check": {
+      "cache": false,
+      "outputs": []
+    },
+    "db:introspect": {
+      "cache": false,
+      "outputs": ["src/drizzle/schema.ts"]
+    },
+    "db:introspect:check": {
+      "cache": false,
+      "outputs": []
+    },
+    "env:example": {
+      "outputs": ["**/.env.example"]
+    },
+    "env:example:check": {
+      "outputs": []
+    },
+    "jobs:codegen": {
+      "outputs": ["../../services/worker-py/jobs_schemas/**"]
+    },
+    "jobs:codegen:check": {
+      "outputs": []
+    }
+  }
+}
