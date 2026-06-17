@@ -11,6 +11,9 @@ importers:
       '@changesets/cli':
         specifier: ^2.27.0
         version: 2.31.0(@types/node@22.19.21)
+      '@stripe/cli':
+        specifier: 1.42.13
+        version: 1.42.13
       prettier:
         specifier: ^3.3.0
         version: 3.8.4
@@ -1023,6 +1026,41 @@ packages:
 
   '@rushstack/eslint-patch@1.16.1':
     resolution: {integrity: sha512-TvZbIpeKqGQQ7X0zSCvPH9riMSFQFSggnfBjFZ1mEoILW+UuXCKwOoPcgjMwiUtRqFZ8jWhPJc4um14vC6I4ag==}
+
+  '@stripe/cli-darwin-arm64@1.42.13':
+    resolution: {integrity: sha512-k0Wnk6M8et77rHqJrHxqzK0Mtsfmc3BGj5RWaoYgp526JQ397Uge7qdedt9IDbzC/U7TwoYh0QqVHUW1s58FRg==}
+    cpu: [arm64]
+    os: [darwin]
+    hasBin: true
+
+  '@stripe/cli-darwin-x64@1.42.13':
+    resolution: {integrity: sha512-35Y+cBkucdTrFBGySgo5mHec/7dkfRhMdIOqHydnGxYVgylYEplSPfJj3On1q0EBn4fB3AUa1Q42rmjMM95KtQ==}
+    cpu: [x64]
+    os: [darwin]
+    hasBin: true
+
+  '@stripe/cli-linux-arm64@1.42.13':
+    resolution: {integrity: sha512-lMThtoaofPMuTeJuPibCcCpNmzneTX26vIUWeRbtVDC6co2PgwCmGsFpEF2RF3ndmEWrxir/2WK8ocFDXQu9xw==}
+    cpu: [arm64]
+    os: [linux]
+    hasBin: true
+
+  '@stripe/cli-linux-x64@1.42.13':
+    resolution: {integrity: sha512-NTHgIuTSTJvGfuPVHu3R04EPCSgrSWTTv7uiscOVHUv7O9v7H6i7RIzteCRziigxNpW87EIMlFGmfFWGtvygfQ==}
+    cpu: [x64]
+    os: [linux]
+    hasBin: true
+
+  '@stripe/cli-win32-x64@1.42.13':
+    resolution: {integrity: sha512-tnC56SLJjYS6OhBq72jXvzMoy8kLaWB4EwNzIFj2l1Q2hgu7pbo91tvhYAnRnF5jh/G3C8CHl3S+trPntLQYRg==}
+    cpu: [x64]
+    os: [win32]
+    hasBin: true
+
+  '@stripe/cli@1.42.13':
+    resolution: {integrity: sha512-Tb2zo3jC0vD4bZY/btHIOPuDf9T1kVxyR09VqwzgM36j12UUrFjq4tt2/FUfFZbF1QTxcHE+dCPeQIOPM9c9DQ==}
+    engines: {node: '>=18.0.0'}
+    hasBin: true
 
   '@supabase/auth-js@2.108.2':
     resolution: {integrity: sha512-tNaQmBgodDZwgB40mRwVbxFy8IDYwjdpcZ0BYrWiwlULCSQoJj4QoG4zgJT7QRPXcqipefNOzvO/qAu4dF98ag==}
@@ -3727,6 +3765,29 @@ snapshots:
   '@rtsao/scc@1.1.0': {}
 
   '@rushstack/eslint-patch@1.16.1': {}
+
+  '@stripe/cli-darwin-arm64@1.42.13':
+    optional: true
+
+  '@stripe/cli-darwin-x64@1.42.13':
+    optional: true
+
+  '@stripe/cli-linux-arm64@1.42.13':
+    optional: true
+
+  '@stripe/cli-linux-x64@1.42.13':
+    optional: true
+
+  '@stripe/cli-win32-x64@1.42.13':
+    optional: true
+
+  '@stripe/cli@1.42.13':
+    optionalDependencies:
+      '@stripe/cli-darwin-arm64': 1.42.13
+      '@stripe/cli-darwin-x64': 1.42.13
+      '@stripe/cli-linux-arm64': 1.42.13
+      '@stripe/cli-linux-x64': 1.42.13
+      '@stripe/cli-win32-x64': 1.42.13
 
   '@supabase/auth-js@2.108.2':
     dependencies:

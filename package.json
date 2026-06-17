@@ -31,6 +31,7 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.0",
+    "@stripe/cli": "1.42.13",
     "prettier": "^3.3.0",
     "supabase": "2.84.2",
     "tsx": "^4.19.0",

@@ -10,7 +10,17 @@ This is a **template**, not a product. Country/jurisdiction/product-specific ada
 
 ## Quick start
 
-Prerequisites on a dev machine: Docker, Node 22+, pnpm 10+, Python 3.11+, [uv](https://github.com/astral-sh/uv), [Supabase CLI](https://supabase.com/docs/guides/cli), [Stripe CLI](https://docs.stripe.com/stripe-cli).
+Host prerequisites — things pnpm can't pin:
+
+- Docker (for Supabase's local stack).
+- Node 22+ and pnpm 9.15+ (chicken-and-egg with everything else).
+- Python 3.11+ and [uv](https://github.com/astral-sh/uv) — `services/worker-py` only.
+
+Project-pinned via `pnpm install` (no host install required):
+
+- Supabase CLI — `supabase` workspace dev dep, binary downloaded into `node_modules/.bin` by postinstall.
+- Stripe CLI — `@stripe/cli` workspace dev dep, same pattern.
+- All Node tooling (turbo, drizzle-kit, vitest, eslint, prettier, tsx, …).
 
 ```sh
 pnpm setup        # idempotent: install + supabase start + migrations + seed + .env.local prompts
