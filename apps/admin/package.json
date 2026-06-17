@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start -p 3001",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@sentry/nextjs": "^8.34.0",
@@ -30,6 +31,7 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.48.0",
     "@template/config": "workspace:*",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.0",
