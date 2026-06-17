@@ -16,7 +16,6 @@ concurrency:
 env:
   NODE_VERSION: 22
   PNPM_VERSION: 9.15.4
-  SUPABASE_CLI_VERSION: 2.84.2
 
 jobs:
   full:
@@ -30,11 +29,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-      - uses: supabase/setup-cli@v1
-        with:
-          version: ${{ env.SUPABASE_CLI_VERSION }}
+      # See ci.yml — supabase CLI is a pinned workspace dev dep.
       - run: pnpm install --frozen-lockfile
-      - run: supabase start
+      - run: pnpm exec supabase start
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
