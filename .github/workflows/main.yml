@@ -1,0 +1,48 @@
+name: Main
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+# Full gate on main/tags. docs/architecture/08-platform.md § CI specifics:
+# Playwright E2E + RLS + prod builds run here, not per-PR, to avoid flake
+# gating individual PRs.
+
+concurrency:
+  group: main-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: 22
+  PNPM_VERSION: 9.15.4
+  SUPABASE_CLI_VERSION: 2.84.2
+
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+      - run: pnpm install --frozen-lockfile
+      - run: supabase start
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm env:example:check
+      - run: pnpm db:types:check
+      - run: pnpm db:introspect:check
+      - run: pnpm -F @template/db test:rls
+      - run: pnpm build
+      # Playwright lands here once apps/* gain E2E suites in Phase 12. Until
+      # then `pnpm test:e2e` no-ops cleanly (no surface has the script).
+      - run: pnpm -r --filter='./apps/*' test:e2e --if-present

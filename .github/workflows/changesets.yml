@@ -1,0 +1,35 @@
+name: Changesets
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['packages/**']
+
+# docs/architecture/08-platform.md § Release / versioning: "PRs that touch
+# packages/* require a changeset file (CI enforces)." Apps + services are
+# unversioned, so this gate scopes to packages/** only.
+
+permissions:
+  pull-requests: read
+  contents: read
+
+jobs:
+  require-changeset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify changeset present
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          changed_changesets=$(git diff --name-only "$BASE" "$HEAD" -- '.changeset/*.md' | grep -v README || true)
+          if [ -z "$changed_changesets" ]; then
+            echo "::error::PR touches packages/** but no .changeset/*.md was added. Run \`pnpm changeset\` to create one."
+            exit 1
+          fi
+          echo "Found changesets:"
+          echo "$changed_changesets"
