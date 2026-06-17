@@ -1,0 +1,31 @@
+{
+  "name": "@template/billing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./provider": "./src/provider.ts",
+    "./emitter": "./src/emitter.ts",
+    "./entitlements": "./src/entitlements/index.ts",
+    "./providers/stripe": "./src/providers/stripe/index.ts",
+    "./registry": "./src/registry.ts",
+    "./conformance": "./src/conformance/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@template/db": "workspace:*",
+    "drizzle-orm": "^0.36.0",
+    "stripe": "^22.2.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@template/config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
