@@ -1,0 +1,30 @@
+{
+  "name": "@template/flags",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./providers/posthog": "./src/providers/posthog.ts",
+    "./overrides/env": "./src/overrides/env.ts",
+    "./overrides/url": "./src/overrides/url.ts",
+    "./overrides/admin": "./src/overrides/admin.ts",
+    "./composition": "./src/composition.ts",
+    "./precedence": "./src/precedence.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@openfeature/server-sdk": "^1.18.0",
+    "posthog-node": "^4.0.0"
+  },
+  "devDependencies": {
+    "@template/config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
