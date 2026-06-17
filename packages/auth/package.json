@@ -1,0 +1,22 @@
+{
+  "name": "@template/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./can": "./src/can.ts",
+    "./providers": "./src/providers.ts",
+    "./middleware": "./src/middleware-helpers.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@template/config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
