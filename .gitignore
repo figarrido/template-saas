@@ -45,6 +45,10 @@ supabase/.branches/
 supabase/.temp/
 supabase/.env
 
+# Claude Code — local-only files (settings.json without .local is committed)
+.claude/settings.local.json
+.claude/skills/
+
 # Misc
 .cache/
 .parcel-cache/
