@@ -12,6 +12,8 @@
 -- Helper: is the current user a member of <org>?
 -- Marked security definer so it can read memberships without recursion via
 -- the calling user's policies.
+-- (select auth.uid()) instead of auth.uid(): evaluated once per query, not per
+-- row. Required for all stable/immutable helper functions used in RLS.
 create or replace function public.is_member_of(target_org uuid)
 returns boolean
 language sql
@@ -21,7 +23,7 @@ set search_path = public
 as $$
   select exists (
     select 1 from public.memberships
-    where user_id = auth.uid()
+    where user_id = (select auth.uid())
       and organization_id = target_org
   );
 $$;
@@ -35,11 +37,17 @@ set search_path = public
 as $$
   select exists (
     select 1 from public.memberships
-    where user_id = auth.uid()
+    where user_id = (select auth.uid())
       and organization_id = target_org
       and role in ('owner', 'admin')
   );
 $$;
+
+-- Revoke direct execute from anon. Both functions are SECURITY DEFINER so they
+-- are callable by all roles by default. anon callers always get false (auth.uid()
+-- returns NULL), but explicit denial is defense in depth.
+revoke execute on function public.is_member_of(uuid) from anon;
+revoke execute on function public.is_org_admin(uuid) from anon;
 
 -- organizations
 alter table public.organizations enable row level security;
@@ -61,27 +69,26 @@ create policy organizations_no_client_insert on public.organizations
 -- profiles
 alter table public.profiles enable row level security;
 
-create policy profiles_select_self on public.profiles
-  for select to authenticated
-  using (user_id = auth.uid());
-
 -- Members of a shared org can see each other's profile (for member lists).
-create policy profiles_select_shared_org on public.profiles
+-- Single merged policy avoids the multiple-permissive-policies performance
+-- penalty; the cheap user_id branch short-circuits before the EXISTS JOIN.
+create policy profiles_select on public.profiles
   for select to authenticated
   using (
-    exists (
+    user_id = (select auth.uid())
+    or exists (
       select 1
       from public.memberships m1
       join public.memberships m2 using (organization_id)
-      where m1.user_id = auth.uid()
+      where m1.user_id = (select auth.uid())
         and m2.user_id = profiles.user_id
     )
   );
 
 create policy profiles_update_self on public.profiles
   for update to authenticated
-  using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
 
 -- memberships
 alter table public.memberships enable row level security;
@@ -90,10 +97,18 @@ create policy memberships_select on public.memberships
   for select to authenticated
   using (public.is_member_of(organization_id));
 
-create policy memberships_modify on public.memberships
-  for all to authenticated
+create policy memberships_insert on public.memberships
+  for insert to authenticated
+  with check (public.is_org_admin(organization_id));
+
+create policy memberships_update on public.memberships
+  for update to authenticated
   using (public.is_org_admin(organization_id))
   with check (public.is_org_admin(organization_id));
+
+create policy memberships_delete on public.memberships
+  for delete to authenticated
+  using (public.is_org_admin(organization_id));
 
 -- invitations
 alter table public.invitations enable row level security;
@@ -102,10 +117,18 @@ create policy invitations_select on public.invitations
   for select to authenticated
   using (public.is_org_admin(organization_id));
 
-create policy invitations_modify on public.invitations
-  for all to authenticated
+create policy invitations_insert on public.invitations
+  for insert to authenticated
+  with check (public.is_org_admin(organization_id));
+
+create policy invitations_update on public.invitations
+  for update to authenticated
   using (public.is_org_admin(organization_id))
   with check (public.is_org_admin(organization_id));
+
+create policy invitations_delete on public.invitations
+  for delete to authenticated
+  using (public.is_org_admin(organization_id));
 
 -- plans (read-only to all authenticated users — needed for upgrade UIs)
 alter table public.plans enable row level security;
@@ -149,7 +172,7 @@ create policy flag_overrides_admin_only on public.flag_overrides
   using (
     exists (
       select 1 from public.admin_users
-      where user_id = auth.uid() and revoked_at is null
+      where user_id = (select auth.uid()) and revoked_at is null
     )
   );
 

@@ -19,6 +19,7 @@ create extension if not exists pg_cron;
 create or replace function public.uuid_generate_v7() returns uuid
 language plpgsql
 volatile
+set search_path = extensions
 as $$
 declare
   unix_ts_ms bytea;
