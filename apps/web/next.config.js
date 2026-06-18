@@ -32,6 +32,16 @@ const nextConfig = {
       '.js': ['.ts', '.tsx', '.js'],
       '.mjs': ['.mts', '.mjs'],
     };
+    // Suppress benign critical-dep warnings from @sentry/nextjs →
+    // @sentry/node → @opentelemetry/instrumentation + require-in-the-middle.
+    // Both use dynamic require() for runtime patching, which webpack can't
+    // statically analyze. Documented as expected by Sentry's Next.js SDK.
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings ?? []),
+      { module: /@opentelemetry\/instrumentation/ },
+      { module: /require-in-the-middle/ },
+      { module: /@prisma\/instrumentation/ },
+    ];
     return config;
   },
   // Static security headers — CSP nonce is injected per-request in middleware.

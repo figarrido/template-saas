@@ -27,6 +27,14 @@ const nextConfig = {
       '.js': ['.ts', '.tsx', '.js'],
       '.mjs': ['.mts', '.mjs'],
     };
+    // See apps/web/next.config.js for context — Sentry's instrumentation
+    // pipeline uses dynamic require() that webpack flags but is harmless.
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings ?? []),
+      { module: /@opentelemetry\/instrumentation/ },
+      { module: /require-in-the-middle/ },
+      { module: /@prisma\/instrumentation/ },
+    ];
     return config;
   },
   // Stricter than apps/web: no analytics origins allowed in default CSP,
