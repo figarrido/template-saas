@@ -1,0 +1,11 @@
+{
+  "name": "@template/worker-py",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "uv run --frozen python -m worker.main",
+    "build": "uv sync --frozen --no-dev",
+    "start": "uv run --frozen --no-dev python -m worker.main",
+    "test": "uv run --frozen pytest"
+  }
+}

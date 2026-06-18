@@ -8,7 +8,7 @@ export const workerPyServer = {
   ...sharedServer,
   WORKER_DATABASE_URL: z.string().url(),
   WORKER_HEALTH_PORT: z.coerce.number().int().positive().default(8082),
-  WORKER_QUEUES: z.string().default('default'),
+  WORKER_QUEUES: z.string().default('data'),
   SHUTDOWN_GRACE_SECONDS: z.coerce.number().int().positive().default(30),
 };
 
@@ -19,7 +19,7 @@ export const workerPySchema: SurfaceSchema = {
     ...sharedExamples,
     WORKER_DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
     WORKER_HEALTH_PORT: '8082',
-    WORKER_QUEUES: 'default',
+    WORKER_QUEUES: 'data',
     SHUTDOWN_GRACE_SECONDS: '30',
   },
   descriptions: {

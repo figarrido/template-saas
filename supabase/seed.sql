@@ -114,6 +114,7 @@ on conflict (organization_id, key) do nothing;
 
 -- One queued job. The Node worker picks this up on first `pnpm dev` so you
 -- can confirm the queue + worker plumbing end-to-end.
+-- Envelope shape matches packages/jobs/src/envelope.ts (camelCase fields).
 select pgmq.send(
   'default',
   jsonb_build_object(
@@ -122,6 +123,6 @@ select pgmq.send(
       'message', 'first job from supabase/seed.sql'
     ),
     'attempt', 0,
-    'enqueued_at', now()
+    'enqueuedAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
   )
 );

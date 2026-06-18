@@ -105,4 +105,7 @@ async function main(): Promise<void> {
   console.warn('\n✔ setup complete — `pnpm dev` to run the apps and workers.');
 }
 
-await main();
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

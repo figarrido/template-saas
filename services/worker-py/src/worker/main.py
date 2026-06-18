@@ -34,25 +34,25 @@ async def _process(conn, queue: str, row: dict[str, Any], log, registry) -> None
     handler = registry.get(name)
     if handler is None:
         log.error("no handler for job, archiving", name=name, msg_id=row["msg_id"])
-        await conn.execute("select pgmq.archive(%s, %s)", (queue, row["msg_id"]))
+        await conn.execute("select pgmq.archive(%s::text, %s::bigint)", (queue, row["msg_id"]))
         return
 
     try:
         await handler(envelope.get("payload"), {"attempt": attempt, "msg_id": row["msg_id"]})
-        await conn.execute("select pgmq.delete(%s, %s)", (queue, row["msg_id"]))
+        await conn.execute("select pgmq.delete(%s::text, %s::bigint)", (queue, row["msg_id"]))
         log.info("job ok", attempt=attempt)
     except Exception as err:  # noqa: BLE001
         log.error("job failed", err=str(err), attempt=attempt)
         if attempt >= DEFAULT_MAX_ATTEMPTS:
-            await conn.execute("select pgmq.archive(%s, %s)", (queue, row["msg_id"]))
+            await conn.execute("select pgmq.archive(%s::text, %s::bigint)", (queue, row["msg_id"]))
             return
         backoff = DEFAULT_BACKOFF_SECONDS[
             min(attempt - 1, len(DEFAULT_BACKOFF_SECONDS) - 1)
         ]
         next_envelope = {**envelope, "attempt": attempt}
-        await conn.execute("select pgmq.delete(%s, %s)", (queue, row["msg_id"]))
+        await conn.execute("select pgmq.delete(%s::text, %s::bigint)", (queue, row["msg_id"]))
         await conn.execute(
-            "select pgmq.send(%s, %s::jsonb, %s)",
+            "select pgmq.send(%s::text, %s::jsonb, %s::integer)",
             (queue, json.dumps(next_envelope), backoff),
         )
 

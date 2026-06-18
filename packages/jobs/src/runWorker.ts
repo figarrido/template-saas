@@ -92,14 +92,14 @@ async function handleMessage({
   const parsed = ENVELOPE_SCHEMA.safeParse(row.message);
   if (!parsed.success) {
     logger.error({ err: parsed.error.format(), msgId: row.msg_id }, 'invalid envelope, archiving');
-    await sql`select pgmq.archive(${queue}, ${row.msg_id})`;
+    await sql`select pgmq.archive(${queue}::text, ${row.msg_id}::bigint)`;
     return;
   }
   const envelope = parsed.data;
   const job = registry.get(envelope.name);
   if (!job) {
     logger.error({ name: envelope.name, msgId: row.msg_id }, 'no handler for job, archiving');
-    await sql`select pgmq.archive(${queue}, ${row.msg_id})`;
+    await sql`select pgmq.archive(${queue}::text, ${row.msg_id}::bigint)`;
     return;
   }
 
@@ -117,18 +117,18 @@ async function handleMessage({
       try {
         const payload = job.payload.parse(envelope.payload);
         await job.handler(payload, ctx);
-        await sql`select pgmq.delete(${queue}, ${row.msg_id})`;
+        await sql`select pgmq.delete(${queue}::text, ${row.msg_id}::bigint)`;
         logger.info({ name: envelope.name, msgId: row.msg_id, attempt }, 'job ok');
       } catch (err) {
         logger.error({ err, name: envelope.name, attempt }, 'job failed');
         if (attempt >= policy.maxAttempts) {
-          await sql`select pgmq.archive(${queue}, ${row.msg_id})`;
+          await sql`select pgmq.archive(${queue}::text, ${row.msg_id}::bigint)`;
           return;
         }
         const backoff = policy.scheduleSeconds[attempt - 1] ?? policy.scheduleSeconds[policy.scheduleSeconds.length - 1] ?? 0;
         const nextEnvelope = { ...envelope, attempt };
-        await sql`select pgmq.delete(${queue}, ${row.msg_id})`;
-        await sql`select pgmq.send(${queue}, ${JSON.stringify(nextEnvelope)}::jsonb, ${backoff})`;
+        await sql`select pgmq.delete(${queue}::text, ${row.msg_id}::bigint)`;
+        await sql`select pgmq.send(${queue}::text, ${JSON.stringify(nextEnvelope)}::jsonb, ${backoff}::integer)`;
       }
     }),
   );
