@@ -9,24 +9,24 @@ export const admin_audit_logRelations = relations(admin_audit_log, ({one}) => ({
 }));
 
 export const admin_usersRelations = relations(admin_users, ({one}) => ({
-	usersInAuth_user_id: one(authUsers, {
-		fields: [admin_users.user_id],
-		references: [authUsers.id],
-		relationName: "admin_users_user_id_usersInAuth_id"
-	}),
 	usersInAuth_granted_by: one(authUsers, {
 		fields: [admin_users.granted_by],
 		references: [authUsers.id],
 		relationName: "admin_users_granted_by_usersInAuth_id"
 	}),
+	usersInAuth_user_id: one(authUsers, {
+		fields: [admin_users.user_id],
+		references: [authUsers.id],
+		relationName: "admin_users_user_id_usersInAuth_id"
+	}),
 }));
 
 export const billing_accountsRelations = relations(billing_accounts, ({one, many}) => ({
+	invoices: many(invoices),
 	organization: one(organizations, {
 		fields: [billing_accounts.organization_id],
 		references: [organizations.organization_id]
 	}),
-	invoices: many(invoices),
 }));
 
 export const entitlementsRelations = relations(entitlements, ({one}) => ({
@@ -41,6 +41,10 @@ export const entitlementsRelations = relations(entitlements, ({one}) => ({
 }));
 
 export const flag_overridesRelations = relations(flag_overrides, ({one}) => ({
+	authUsers: one(authUsers, {
+		fields: [flag_overrides.set_by],
+		references: [authUsers.id]
+	}),
 	organization: one(organizations, {
 		fields: [flag_overrides.organization_id],
 		references: [organizations.organization_id]
@@ -48,10 +52,6 @@ export const flag_overridesRelations = relations(flag_overrides, ({one}) => ({
 	profile: one(profiles, {
 		fields: [flag_overrides.user_id],
 		references: [profiles.user_id]
-	}),
-	authUsers: one(authUsers, {
-		fields: [flag_overrides.set_by],
-		references: [authUsers.id]
 	}),
 }));
 
@@ -67,36 +67,36 @@ export const invitationsRelations = relations(invitations, ({one}) => ({
 }));
 
 export const invoicesRelations = relations(invoices, ({one, many}) => ({
-	organization: one(organizations, {
-		fields: [invoices.organization_id],
-		references: [organizations.organization_id]
-	}),
 	billing_account: one(billing_accounts, {
 		fields: [invoices.billing_account_id],
 		references: [billing_accounts.billing_account_id]
+	}),
+	organization: one(organizations, {
+		fields: [invoices.organization_id],
+		references: [organizations.organization_id]
 	}),
 	tax_documents: many(tax_documents),
 }));
 
 export const membershipsRelations = relations(memberships, ({one}) => ({
-	profile: one(profiles, {
-		fields: [memberships.user_id],
-		references: [profiles.user_id]
-	}),
 	organization: one(organizations, {
 		fields: [memberships.organization_id],
 		references: [organizations.organization_id]
 	}),
+	profile: one(profiles, {
+		fields: [memberships.user_id],
+		references: [profiles.user_id]
+	}),
 }));
 
 export const organizationsRelations = relations(organizations, ({many}) => ({
-	memberships: many(memberships),
-	entitlements: many(entitlements),
 	billing_accounts: many(billing_accounts),
-	invoices: many(invoices),
-	invitations: many(invitations),
-	tax_documents: many(tax_documents),
+	entitlements: many(entitlements),
 	flag_overrides: many(flag_overrides),
+	invitations: many(invitations),
+	invoices: many(invoices),
+	memberships: many(memberships),
+	tax_documents: many(tax_documents),
 }));
 
 export const plansRelations = relations(plans, ({many}) => ({
@@ -108,9 +108,9 @@ export const profilesRelations = relations(profiles, ({one, many}) => ({
 		fields: [profiles.user_id],
 		references: [authUsers.id]
 	}),
-	memberships: many(memberships),
-	invitations: many(invitations),
 	flag_overrides: many(flag_overrides),
+	invitations: many(invitations),
+	memberships: many(memberships),
 }));
 
 export const tax_documentsRelations = relations(tax_documents, ({one}) => ({
@@ -125,13 +125,13 @@ export const tax_documentsRelations = relations(tax_documents, ({one}) => ({
 }));
 
 export const usersInAuthRelations = relations(authUsers, ({many}) => ({
-	profiles: many(profiles),
 	admin_audit_logs: many(admin_audit_log),
-	flag_overrides: many(flag_overrides),
-	admin_users_user_id: many(admin_users, {
-		relationName: "admin_users_user_id_usersInAuth_id"
-	}),
 	admin_users_granted_by: many(admin_users, {
 		relationName: "admin_users_granted_by_usersInAuth_id"
 	}),
+	admin_users_user_id: many(admin_users, {
+		relationName: "admin_users_user_id_usersInAuth_id"
+	}),
+	flag_overrides: many(flag_overrides),
+	profiles: many(profiles),
 }));

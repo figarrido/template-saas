@@ -100,6 +100,32 @@ function sortSchemaExports(schema: string): string {
   return header + sorted.map(b => b.text).join('\n\n') + '\n';
 }
 
+// Sort the top-level properties inside a single relation block alphabetically.
+// Each property starts at \n\t<word>: (single tab = top level; nested lines use \t\t).
+function sortRelationBlockProps(blockText: string): string {
+  const markerIdx = blockText.indexOf('=> ({');
+  if (markerIdx === -1) return blockText;
+  const afterMarker = markerIdx + '=> ({'.length;
+  const closingIdx = blockText.lastIndexOf('\n}));');
+  if (closingIdx === -1) return blockText;
+
+  const prefix = blockText.slice(0, afterMarker);
+  // propsContent: everything between => ({ and the final \n}));  (no trailing \n)
+  const propsContent = blockText.slice(afterMarker, closingIdx);
+  const suffix = blockText.slice(closingIdx); // starts with \n
+
+  // Split at each \n\t<word> boundary (top-level property, not nested \t\t lines)
+  const chunks = propsContent.split(/(?=\n\t\w)/).filter(c => c.length > 0);
+  if (chunks.length <= 1) return blockText;
+
+  const props = chunks.map(chunk => {
+    const m = /^\n\t(\w+):/.exec(chunk);
+    return { name: m?.[1] ?? '', text: chunk };
+  });
+  props.sort((a, b) => a.name.localeCompare(b.name));
+  return prefix + props.map(p => p.text).join('') + suffix;
+}
+
 function sortRelationsExports(content: string): string {
   // Sort the import names from ./schema alphabetically
   const out = content.replace(
@@ -114,8 +140,10 @@ function sortRelationsExports(content: string): string {
   const header = out.slice(0, first.index);
   const body = out.slice(first.index);
   const blocks = extractExportBlocks(body, 'relations');
-  blocks.sort((a, b) => a.name.localeCompare(b.name));
-  return header + blocks.map(b => b.text).join('\n\n') + '\n';
+  // Sort within-block properties, then sort blocks alphabetically
+  const normalised = blocks.map(b => ({ ...b, text: sortRelationBlockProps(b.text) }));
+  normalised.sort((a, b) => a.name.localeCompare(b.name));
+  return header + normalised.map(b => b.text).join('\n\n') + '\n';
 }
 
 export function patchIntrospectOutput(drizzleDir: string): void {
