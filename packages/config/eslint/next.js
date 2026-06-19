@@ -1,5 +1,6 @@
 import base from './base.js';
 import globals from 'globals';
+import react from 'eslint-plugin-react';
 
 // `getServiceClient` import ban for client-app surfaces.
 // Consumers (e.g. `apps/web/eslint.config.js`) compose this rule into their
@@ -27,6 +28,7 @@ export const banServiceClient = {
 export default [
   ...base,
   {
+    plugins: { react },
     languageOptions: {
       globals: { ...globals.browser, ...globals.node, ...globals.es2022 },
     },
