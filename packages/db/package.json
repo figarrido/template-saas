@@ -9,7 +9,7 @@
     "./schema": "./src/drizzle/schema.ts"
   },
   "scripts": {
-    "db:types": "supabase gen types typescript --local --schema public > src/types/database.types.ts",
+    "db:types": "tsx scripts/gen-types.ts",
     "db:types:check": "tsx scripts/types-drift.ts",
     "db:introspect": "drizzle-kit introspect && tsx scripts/post-introspect.ts",
     "db:introspect:check": "tsx scripts/introspect-drift.ts",

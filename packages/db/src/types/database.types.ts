@@ -101,7 +101,6 @@ export type Database = {
           {
             foreignKeyName: "billing_accounts_organization_id_fkey"
             columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["organization_id"]
           },
@@ -148,14 +147,12 @@ export type Database = {
           {
             foreignKeyName: "entitlements_organization_id_fkey"
             columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "entitlements_plan_id_fkey"
             columns: ["plan_id"]
-            isOneToOne: false
             referencedRelation: "plans"
             referencedColumns: ["plan_id"]
           },
@@ -202,14 +199,12 @@ export type Database = {
           {
             foreignKeyName: "flag_overrides_organization_id_fkey"
             columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "flag_overrides_user_id_fkey"
             columns: ["user_id"]
-            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -259,14 +254,12 @@ export type Database = {
           {
             foreignKeyName: "invitations_invited_by_fkey"
             columns: ["invited_by"]
-            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "invitations_organization_id_fkey"
             columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["organization_id"]
           },
@@ -325,14 +318,12 @@ export type Database = {
           {
             foreignKeyName: "invoices_billing_account_id_fkey"
             columns: ["billing_account_id"]
-            isOneToOne: false
             referencedRelation: "billing_accounts"
             referencedColumns: ["billing_account_id"]
           },
           {
             foreignKeyName: "invoices_organization_id_fkey"
             columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["organization_id"]
           },
@@ -367,14 +358,12 @@ export type Database = {
           {
             foreignKeyName: "memberships_organization_id_fkey"
             columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["organization_id"]
           },
           {
             foreignKeyName: "memberships_user_id_fkey"
             columns: ["user_id"]
-            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -505,14 +494,12 @@ export type Database = {
           {
             foreignKeyName: "tax_documents_invoice_id_fkey"
             columns: ["invoice_id"]
-            isOneToOne: false
             referencedRelation: "invoices"
             referencedColumns: ["invoice_id"]
           },
           {
             foreignKeyName: "tax_documents_organization_id_fkey"
             columns: ["organization_id"]
-            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["organization_id"]
           },
@@ -666,4 +653,3 @@ export const Constants = {
     },
   },
 } as const
-
