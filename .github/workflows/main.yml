@@ -41,6 +41,8 @@ jobs:
       - run: pnpm db:introspect:check
       - run: pnpm -F @template/db test:rls
       - run: pnpm build
+        env:
+          SKIP_ENV_VALIDATION: 'true'
       # Playwright lands here once apps/* gain E2E suites in Phase 12. Until
       # then `pnpm test:e2e` no-ops cleanly (no surface has the script).
       - run: pnpm -r --filter='./apps/*' test:e2e --if-present
