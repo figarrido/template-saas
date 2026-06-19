@@ -57,6 +57,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+      - uses: astral-sh/setup-uv@v6
       - run: pnpm install --frozen-lockfile
       # Excludes test:rls which needs the live Supabase stack; that runs in
       # the `migration-validation` job below and again on main.

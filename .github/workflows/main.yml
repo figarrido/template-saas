@@ -30,6 +30,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       # See ci.yml — supabase CLI is a pinned workspace dev dep.
+      - uses: astral-sh/setup-uv@v6
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec supabase start
       - run: pnpm lint
