@@ -22,9 +22,9 @@ export const organizations = pgTable("organizations", {
 }, (table) => {
 	return {
 		organizations_slug_key: unique("organizations_slug_key").on(table.slug),
-		organizations_no_client_insert: pgPolicy("organizations_no_client_insert", { as: "permissive", for: "insert", to: ["authenticated"], withCheck: sql`false`  }),
+		organizations_select: pgPolicy("organizations_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`is_member_of(organization_id)` }),
 		organizations_update: pgPolicy("organizations_update", { as: "permissive", for: "update", to: ["authenticated"] }),
-		organizations_select: pgPolicy("organizations_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+		organizations_no_client_insert: pgPolicy("organizations_no_client_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
 	}
 });
 
@@ -41,9 +41,8 @@ export const profiles = pgTable("profiles", {
 			foreignColumns: [authUsers.id],
 			name: "profiles_user_id_fkey"
 		}).onDelete("cascade"),
-		profiles_update_self: pgPolicy("profiles_update_self", { as: "permissive", for: "update", to: ["authenticated"], using: sql`(user_id = auth.uid())`, withCheck: sql`(user_id = auth.uid())`  }),
-		profiles_select_shared_org: pgPolicy("profiles_select_shared_org", { as: "permissive", for: "select", to: ["authenticated"] }),
-		profiles_select_self: pgPolicy("profiles_select_self", { as: "permissive", for: "select", to: ["authenticated"] }),
+		profiles_update_self: pgPolicy("profiles_update_self", { as: "permissive", for: "update", to: ["authenticated"], using: sql`(user_id = ( SELECT auth.uid() AS uid))`, withCheck: sql`(user_id = ( SELECT auth.uid() AS uid))`  }),
+		profiles_select: pgPolicy("profiles_select", { as: "permissive", for: "select", to: ["authenticated"] }),
 	}
 });
 
@@ -69,8 +68,10 @@ export const memberships = pgTable("memberships", {
 			name: "memberships_organization_id_fkey"
 		}).onDelete("cascade"),
 		memberships_user_id_organization_id_key: unique("memberships_user_id_organization_id_key").on(table.user_id, table.organization_id),
-		memberships_modify: pgPolicy("memberships_modify", { as: "permissive", for: "all", to: ["authenticated"], using: sql`is_org_admin(organization_id)`, withCheck: sql`is_org_admin(organization_id)`  }),
-		memberships_select: pgPolicy("memberships_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+		memberships_select: pgPolicy("memberships_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`is_member_of(organization_id)` }),
+		memberships_insert: pgPolicy("memberships_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+		memberships_update: pgPolicy("memberships_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+		memberships_delete: pgPolicy("memberships_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
 	}
 });
 
@@ -102,30 +103,10 @@ export const invitations = pgTable("invitations", {
 		}).onDelete("set null"),
 		invitations_organization_id_email_status_key: unique("invitations_organization_id_email_status_key").on(table.organization_id, table.email, table.status),
 		invitations_token_key: unique("invitations_token_key").on(table.token),
-		invitations_modify: pgPolicy("invitations_modify", { as: "permissive", for: "all", to: ["authenticated"], using: sql`is_org_admin(organization_id)`, withCheck: sql`is_org_admin(organization_id)`  }),
-		invitations_select: pgPolicy("invitations_select", { as: "permissive", for: "select", to: ["authenticated"] }),
-	}
-});
-
-export const admin_users = pgTable("admin_users", {
-	user_id: uuid().primaryKey().notNull(),
-	granted_by: uuid(),
-	granted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
-	notes: text(),
-}, (table) => {
-	return {
-		active_idx: index("admin_users_active_idx").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")).where(sql`(revoked_at IS NULL)`),
-		admin_users_user_id_fkey: foreignKey({
-			columns: [table.user_id],
-			foreignColumns: [authUsers.id],
-			name: "admin_users_user_id_fkey"
-		}).onDelete("cascade"),
-		admin_users_granted_by_fkey: foreignKey({
-			columns: [table.granted_by],
-			foreignColumns: [authUsers.id],
-			name: "admin_users_granted_by_fkey"
-		}).onDelete("set null"),
+		invitations_select: pgPolicy("invitations_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`is_org_admin(organization_id)` }),
+		invitations_insert: pgPolicy("invitations_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+		invitations_update: pgPolicy("invitations_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+		invitations_delete: pgPolicy("invitations_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
 	}
 });
 
@@ -319,7 +300,29 @@ export const flag_overrides = pgTable("flag_overrides", {
 		}).onDelete("set null"),
 		flag_overrides_admin_only: pgPolicy("flag_overrides_admin_only", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(EXISTS ( SELECT 1
    FROM admin_users
-  WHERE ((admin_users.user_id = auth.uid()) AND (admin_users.revoked_at IS NULL))))` }),
+  WHERE ((admin_users.user_id = ( SELECT auth.uid() AS uid)) AND (admin_users.revoked_at IS NULL))))` }),
 		flag_overrides_check: check("flag_overrides_check", sql`((organization_id IS NULL) AND (user_id IS NULL)) OR ((organization_id IS NOT NULL) AND (user_id IS NULL)) OR ((organization_id IS NULL) AND (user_id IS NOT NULL))`),
+	}
+});
+
+export const admin_users = pgTable("admin_users", {
+	user_id: uuid().primaryKey().notNull(),
+	granted_by: uuid(),
+	granted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+	notes: text(),
+}, (table) => {
+	return {
+		active_idx: index("admin_users_active_idx").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")).where(sql`(revoked_at IS NULL)`),
+		admin_users_user_id_fkey: foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [authUsers.id],
+			name: "admin_users_user_id_fkey"
+		}).onDelete("cascade"),
+		admin_users_granted_by_fkey: foreignKey({
+			columns: [table.granted_by],
+			foreignColumns: [authUsers.id],
+			name: "admin_users_granted_by_fkey"
+		}).onDelete("set null"),
 	}
 });
