@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { authUsers, profiles, memberships, organizations, invitations, admin_users, entitlements, plans, billing_accounts, invoices, admin_audit_log, tax_documents, flag_overrides } from "./schema";
+import { authUsers, profiles, memberships, organizations, entitlements, plans, billing_accounts, invoices, admin_audit_log, invitations, tax_documents, flag_overrides, admin_users } from "./schema";
 
 export const profilesRelations = relations(profiles, ({one, many}) => ({
 	authUsers: one(authUsers, {
@@ -13,14 +13,14 @@ export const profilesRelations = relations(profiles, ({one, many}) => ({
 
 export const usersInAuthRelations = relations(authUsers, ({many}) => ({
 	profiles: many(profiles),
+	admin_audit_logs: many(admin_audit_log),
+	flag_overrides: many(flag_overrides),
 	admin_users_user_id: many(admin_users, {
 		relationName: "admin_users_user_id_usersInAuth_id"
 	}),
 	admin_users_granted_by: many(admin_users, {
 		relationName: "admin_users_granted_by_usersInAuth_id"
 	}),
-	admin_audit_logs: many(admin_audit_log),
-	flag_overrides: many(flag_overrides),
 }));
 
 export const membershipsRelations = relations(memberships, ({one}) => ({
@@ -36,36 +36,12 @@ export const membershipsRelations = relations(memberships, ({one}) => ({
 
 export const organizationsRelations = relations(organizations, ({many}) => ({
 	memberships: many(memberships),
-	invitations: many(invitations),
 	entitlements: many(entitlements),
 	billing_accounts: many(billing_accounts),
 	invoices: many(invoices),
+	invitations: many(invitations),
 	tax_documents: many(tax_documents),
 	flag_overrides: many(flag_overrides),
-}));
-
-export const invitationsRelations = relations(invitations, ({one}) => ({
-	organization: one(organizations, {
-		fields: [invitations.organization_id],
-		references: [organizations.organization_id]
-	}),
-	profile: one(profiles, {
-		fields: [invitations.invited_by],
-		references: [profiles.user_id]
-	}),
-}));
-
-export const admin_usersRelations = relations(admin_users, ({one}) => ({
-	usersInAuth_user_id: one(authUsers, {
-		fields: [admin_users.user_id],
-		references: [authUsers.id],
-		relationName: "admin_users_user_id_usersInAuth_id"
-	}),
-	usersInAuth_granted_by: one(authUsers, {
-		fields: [admin_users.granted_by],
-		references: [authUsers.id],
-		relationName: "admin_users_granted_by_usersInAuth_id"
-	}),
 }));
 
 export const entitlementsRelations = relations(entitlements, ({one}) => ({
@@ -110,6 +86,17 @@ export const admin_audit_logRelations = relations(admin_audit_log, ({one}) => ({
 	}),
 }));
 
+export const invitationsRelations = relations(invitations, ({one}) => ({
+	organization: one(organizations, {
+		fields: [invitations.organization_id],
+		references: [organizations.organization_id]
+	}),
+	profile: one(profiles, {
+		fields: [invitations.invited_by],
+		references: [profiles.user_id]
+	}),
+}));
+
 export const tax_documentsRelations = relations(tax_documents, ({one}) => ({
 	invoice: one(invoices, {
 		fields: [tax_documents.invoice_id],
@@ -133,5 +120,18 @@ export const flag_overridesRelations = relations(flag_overrides, ({one}) => ({
 	authUsers: one(authUsers, {
 		fields: [flag_overrides.set_by],
 		references: [authUsers.id]
+	}),
+}));
+
+export const admin_usersRelations = relations(admin_users, ({one}) => ({
+	usersInAuth_user_id: one(authUsers, {
+		fields: [admin_users.user_id],
+		references: [authUsers.id],
+		relationName: "admin_users_user_id_usersInAuth_id"
+	}),
+	usersInAuth_granted_by: one(authUsers, {
+		fields: [admin_users.granted_by],
+		references: [authUsers.id],
+		relationName: "admin_users_granted_by_usersInAuth_id"
 	}),
 }));

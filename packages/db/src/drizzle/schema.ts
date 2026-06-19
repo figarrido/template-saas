@@ -1,4 +1,4 @@
-import { pgTable, unique, pgPolicy, uuid, text, timestamp, foreignKey, index, boolean, jsonb, bigint, uniqueIndex, check, pgEnum, pgSchema } from "drizzle-orm/pg-core";import { sql } from "drizzle-orm"
+import { pgTable, unique, pgPolicy, uuid, text, timestamp, foreignKey, index, jsonb, bigint, boolean, uniqueIndex, check, pgEnum, pgSchema } from "drizzle-orm/pg-core";import { sql } from "drizzle-orm"
 // Minimal reference to Supabase's auth.users so FK columns resolve.
 // Owned by Supabase Auth — never migrate from this codebase.
 const authSchema = pgSchema("auth");
@@ -72,78 +72,6 @@ export const memberships = pgTable("memberships", {
 		memberships_insert: pgPolicy("memberships_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
 		memberships_update: pgPolicy("memberships_update", { as: "permissive", for: "update", to: ["authenticated"] }),
 		memberships_delete: pgPolicy("memberships_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
-	}
-});
-
-export const invitations = pgTable("invitations", {
-	invitation_id: uuid().default(sql`uuid_generate_v7()`).primaryKey().notNull(),
-	organization_id: uuid().notNull(),
-	email: text().notNull(),
-	role: membership_role().default('member').notNull(),
-	status: invitation_status().default('pending').notNull(),
-	invited_by: uuid(),
-	token: text().notNull(),
-	expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-	accepted_at: timestamp({ withTimezone: true, mode: 'string' }),
-	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => {
-	return {
-		email_idx: index("invitations_email_idx").using("btree", sql`lower(email)`),
-		organization_id_idx: index("invitations_organization_id_idx").using("btree", table.organization_id.asc().nullsLast().op("uuid_ops")),
-		invitations_organization_id_fkey: foreignKey({
-			columns: [table.organization_id],
-			foreignColumns: [organizations.organization_id],
-			name: "invitations_organization_id_fkey"
-		}).onDelete("cascade"),
-		invitations_invited_by_fkey: foreignKey({
-			columns: [table.invited_by],
-			foreignColumns: [profiles.user_id],
-			name: "invitations_invited_by_fkey"
-		}).onDelete("set null"),
-		invitations_organization_id_email_status_key: unique("invitations_organization_id_email_status_key").on(table.organization_id, table.email, table.status),
-		invitations_token_key: unique("invitations_token_key").on(table.token),
-		invitations_select: pgPolicy("invitations_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`is_org_admin(organization_id)` }),
-		invitations_insert: pgPolicy("invitations_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
-		invitations_update: pgPolicy("invitations_update", { as: "permissive", for: "update", to: ["authenticated"] }),
-		invitations_delete: pgPolicy("invitations_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
-	}
-});
-
-export const admin_users = pgTable("admin_users", {
-	user_id: uuid().primaryKey().notNull(),
-	granted_by: uuid(),
-	granted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
-	notes: text(),
-}, (table) => {
-	return {
-		active_idx: index("admin_users_active_idx").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")).where(sql`(revoked_at IS NULL)`),
-		admin_users_user_id_fkey: foreignKey({
-			columns: [table.user_id],
-			foreignColumns: [authUsers.id],
-			name: "admin_users_user_id_fkey"
-		}).onDelete("cascade"),
-		admin_users_granted_by_fkey: foreignKey({
-			columns: [table.granted_by],
-			foreignColumns: [authUsers.id],
-			name: "admin_users_granted_by_fkey"
-		}).onDelete("set null"),
-	}
-});
-
-export const plans = pgTable("plans", {
-	plan_id: uuid().default(sql`uuid_generate_v7()`).primaryKey().notNull(),
-	slug: text().notNull(),
-	name: text().notNull(),
-	description: text(),
-	is_active: boolean().default(true).notNull(),
-	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => {
-	return {
-		plans_slug_key: unique("plans_slug_key").on(table.slug),
-		plans_select: pgPolicy("plans_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`is_active` }),
 	}
 });
 
@@ -256,6 +184,56 @@ export const admin_audit_log = pgTable("admin_audit_log", {
 	}
 });
 
+export const plans = pgTable("plans", {
+	plan_id: uuid().default(sql`uuid_generate_v7()`).primaryKey().notNull(),
+	slug: text().notNull(),
+	name: text().notNull(),
+	description: text(),
+	is_active: boolean().default(true).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => {
+	return {
+		plans_slug_key: unique("plans_slug_key").on(table.slug),
+		plans_select: pgPolicy("plans_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`is_active` }),
+	}
+});
+
+export const invitations = pgTable("invitations", {
+	invitation_id: uuid().default(sql`uuid_generate_v7()`).primaryKey().notNull(),
+	organization_id: uuid().notNull(),
+	email: text().notNull(),
+	role: membership_role().default('member').notNull(),
+	status: invitation_status().default('pending').notNull(),
+	invited_by: uuid(),
+	token: text().notNull(),
+	expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+	accepted_at: timestamp({ withTimezone: true, mode: 'string' }),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => {
+	return {
+		email_idx: index("invitations_email_idx").using("btree", sql`lower(email)`),
+		organization_id_idx: index("invitations_organization_id_idx").using("btree", table.organization_id.asc().nullsLast().op("uuid_ops")),
+		invitations_organization_id_fkey: foreignKey({
+			columns: [table.organization_id],
+			foreignColumns: [organizations.organization_id],
+			name: "invitations_organization_id_fkey"
+		}).onDelete("cascade"),
+		invitations_invited_by_fkey: foreignKey({
+			columns: [table.invited_by],
+			foreignColumns: [profiles.user_id],
+			name: "invitations_invited_by_fkey"
+		}).onDelete("set null"),
+		invitations_organization_id_email_status_key: unique("invitations_organization_id_email_status_key").on(table.organization_id, table.email, table.status),
+		invitations_token_key: unique("invitations_token_key").on(table.token),
+		invitations_select: pgPolicy("invitations_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`is_org_admin(organization_id)` }),
+		invitations_insert: pgPolicy("invitations_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+		invitations_update: pgPolicy("invitations_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+		invitations_delete: pgPolicy("invitations_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+	}
+});
+
 export const tax_documents = pgTable("tax_documents", {
 	tax_document_id: uuid().default(sql`uuid_generate_v7()`).primaryKey().notNull(),
 	invoice_id: uuid().notNull(),
@@ -324,5 +302,27 @@ export const flag_overrides = pgTable("flag_overrides", {
    FROM admin_users
   WHERE ((admin_users.user_id = ( SELECT auth.uid() AS uid)) AND (admin_users.revoked_at IS NULL))))` }),
 		flag_overrides_check: check("flag_overrides_check", sql`((organization_id IS NULL) AND (user_id IS NULL)) OR ((organization_id IS NOT NULL) AND (user_id IS NULL)) OR ((organization_id IS NULL) AND (user_id IS NOT NULL))`),
+	}
+});
+
+export const admin_users = pgTable("admin_users", {
+	user_id: uuid().primaryKey().notNull(),
+	granted_by: uuid(),
+	granted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+	notes: text(),
+}, (table) => {
+	return {
+		active_idx: index("admin_users_active_idx").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")).where(sql`(revoked_at IS NULL)`),
+		admin_users_user_id_fkey: foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [authUsers.id],
+			name: "admin_users_user_id_fkey"
+		}).onDelete("cascade"),
+		admin_users_granted_by_fkey: foreignKey({
+			columns: [table.granted_by],
+			foreignColumns: [authUsers.id],
+			name: "admin_users_granted_by_fkey"
+		}).onDelete("set null"),
 	}
 });
