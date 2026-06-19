@@ -110,6 +110,28 @@ export const invitations = pgTable("invitations", {
 	}
 });
 
+export const admin_users = pgTable("admin_users", {
+	user_id: uuid().primaryKey().notNull(),
+	granted_by: uuid(),
+	granted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+	notes: text(),
+}, (table) => {
+	return {
+		active_idx: index("admin_users_active_idx").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")).where(sql`(revoked_at IS NULL)`),
+		admin_users_user_id_fkey: foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [authUsers.id],
+			name: "admin_users_user_id_fkey"
+		}).onDelete("cascade"),
+		admin_users_granted_by_fkey: foreignKey({
+			columns: [table.granted_by],
+			foreignColumns: [authUsers.id],
+			name: "admin_users_granted_by_fkey"
+		}).onDelete("set null"),
+	}
+});
+
 export const plans = pgTable("plans", {
 	plan_id: uuid().default(sql`uuid_generate_v7()`).primaryKey().notNull(),
 	slug: text().notNull(),
@@ -302,27 +324,5 @@ export const flag_overrides = pgTable("flag_overrides", {
    FROM admin_users
   WHERE ((admin_users.user_id = ( SELECT auth.uid() AS uid)) AND (admin_users.revoked_at IS NULL))))` }),
 		flag_overrides_check: check("flag_overrides_check", sql`((organization_id IS NULL) AND (user_id IS NULL)) OR ((organization_id IS NOT NULL) AND (user_id IS NULL)) OR ((organization_id IS NULL) AND (user_id IS NOT NULL))`),
-	}
-});
-
-export const admin_users = pgTable("admin_users", {
-	user_id: uuid().primaryKey().notNull(),
-	granted_by: uuid(),
-	granted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
-	notes: text(),
-}, (table) => {
-	return {
-		active_idx: index("admin_users_active_idx").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")).where(sql`(revoked_at IS NULL)`),
-		admin_users_user_id_fkey: foreignKey({
-			columns: [table.user_id],
-			foreignColumns: [authUsers.id],
-			name: "admin_users_user_id_fkey"
-		}).onDelete("cascade"),
-		admin_users_granted_by_fkey: foreignKey({
-			columns: [table.granted_by],
-			foreignColumns: [authUsers.id],
-			name: "admin_users_granted_by_fkey"
-		}).onDelete("set null"),
 	}
 });
