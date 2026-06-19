@@ -23,7 +23,7 @@ function extractExportBlocks(content: string, funcName: string): ExportBlock[] {
   let m: RegExpExecArray | null;
 
   while ((m = pattern.exec(content)) !== null) {
-    const name = m[1];
+    const name = m[1]!;
     const start = m.index;
     let depth = 0;
     let i = start;
@@ -45,7 +45,8 @@ function getTableDependencies(blockText: string, tableNames: Set<string>): strin
   const re = /foreignColumns:\s*\[(\w+)\./g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(blockText)) !== null) {
-    if (tableNames.has(m[1])) deps.add(m[1]);
+    const dep = m[1]!;
+    if (tableNames.has(dep)) deps.add(dep);
   }
   return [...deps];
 }
