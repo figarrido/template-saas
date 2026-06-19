@@ -16,6 +16,8 @@ concurrency:
 env:
   NODE_VERSION: 22
   PNPM_VERSION: 9.15.4
+  # Keep in sync with the `supabase` version in package.json.
+  SUPABASE_VERSION: 2.107.0
 
 jobs:
   lint:
@@ -85,6 +87,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Install the CLI globally before pnpm install so we can start Supabase
+      # in the background and overlap image-pulling with the pnpm setup steps.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_VERSION }}
+      - name: Start Supabase (background)
+        run: nohup supabase start > /tmp/supabase-start.log 2>&1 &
       - uses: pnpm/action-setup@v4
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -92,11 +101,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-      # `supabase` is a pinned workspace dev dep — postinstall fetches the
-      # matching CLI binary into node_modules/.bin, which pnpm scripts pick up
-      # via PATH. No external setup-cli action needed.
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec supabase start
+      - name: Wait for Supabase
+        run: |
+          timeout 300 bash -c 'until supabase status 2>/dev/null; do sleep 3; done'
       - run: pnpm db:types:check
       - run: pnpm db:introspect:check
       - run: pnpm -F @template/db test:rls
