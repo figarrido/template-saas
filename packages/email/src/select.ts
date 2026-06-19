@@ -32,6 +32,6 @@ export function selectEmailProvider(env: SelectProviderEnv = process.env as Sele
   }
 
   const host = env.SMTP_HOST ?? '127.0.0.1';
-  const port = Number(env.SMTP_PORT ?? 54325); // InBucket default exposed in supabase/config.toml
+  const port = Number(env.SMTP_PORT ?? 54425); // InBucket default exposed in supabase/config.toml
   return new SmtpProvider({ host, port, user: env.SMTP_USER, pass: env.SMTP_PASS });
 }

@@ -17,7 +17,7 @@ export const workerNodeSchema: SurfaceSchema = {
   server: workerNodeServer,
   examples: {
     ...sharedExamples,
-    WORKER_DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+    WORKER_DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:54422/postgres',
     WORKER_HEALTH_PORT: '8081',
     WORKER_QUEUES: 'default,emails,billing',
     SHUTDOWN_GRACE_SECONDS: '30',

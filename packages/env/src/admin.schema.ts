@@ -30,10 +30,10 @@ export const adminSchema: SurfaceSchema = {
   client: adminClient,
   examples: {
     ...sharedExamples,
-    ADMIN_DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+    ADMIN_DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:54422/postgres',
     MAIL_PROVIDER: 'smtp',
     SMTP_HOST: '127.0.0.1',
-    SMTP_PORT: '54325',
+    SMTP_PORT: '54425',
     NEXT_PUBLIC_SITE_URL: 'http://localhost:3001',
   },
   descriptions: {

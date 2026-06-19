@@ -11,7 +11,7 @@ export default {
     url:
       process.env.WORKER_DATABASE_URL ??
       process.env.ADMIN_DATABASE_URL ??
-      'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+      'postgresql://postgres:postgres@127.0.0.1:54422/postgres',
   },
   // Public schema only. drizzle-kit chokes on some Supabase-internal auth
   // indexes; the `pnpm db:introspect` script post-processes the output to

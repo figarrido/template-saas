@@ -80,7 +80,7 @@ function writeEnvLocal(target: Target, supabase: Map<string, string>): void {
     } else if (v.name === 'SMTP_HOST') {
       value = '127.0.0.1';
     } else if (v.name === 'SMTP_PORT') {
-      value = '54325';
+      value = '54425';
     } else {
       value = v.example ?? '';
     }

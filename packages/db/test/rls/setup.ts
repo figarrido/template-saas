@@ -4,7 +4,7 @@ import postgres from 'postgres';
 // confirm cross-tenant denial would be visible to admin tools.
 export const serviceSql = postgres(
   process.env.WORKER_DATABASE_URL ??
-    'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+    'postgresql://postgres:postgres@127.0.0.1:54422/postgres',
   { max: 4, prepare: false },
 );
 

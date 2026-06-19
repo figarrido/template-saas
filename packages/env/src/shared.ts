@@ -29,9 +29,9 @@ export const sharedDescriptions: Record<string, string> = {
 
 export const sharedExamples: Record<string, string> = {
   NODE_ENV: 'development',
-  SUPABASE_URL: 'http://127.0.0.1:54321',
+  SUPABASE_URL: 'http://127.0.0.1:54421',
   SUPABASE_SERVICE_ROLE_KEY: 'eyJ...replace-me',
   SENTRY_DSN: 'https://examplePublicKey@o0.ingest.sentry.io/0',
-  NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321',
+  NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54421',
   NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJ...replace-me',
 };

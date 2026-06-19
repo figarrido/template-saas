@@ -20,7 +20,7 @@ const configPath = resolve(tmp, 'drizzle.config.ts');
 const dbUrl =
   process.env.WORKER_DATABASE_URL ??
   process.env.ADMIN_DATABASE_URL ??
-  'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
+  'postgresql://postgres:postgres@127.0.0.1:54422/postgres';
 
 writeFileSync(
   configPath,

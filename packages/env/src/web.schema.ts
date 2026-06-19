@@ -33,7 +33,7 @@ export const webSchema: SurfaceSchema = {
     STRIPE_WEBHOOK_SECRET: 'whsec_replace_me',
     MAIL_PROVIDER: 'smtp',
     SMTP_HOST: '127.0.0.1',
-    SMTP_PORT: '54325',
+    SMTP_PORT: '54425',
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_replace_me',
     NEXT_PUBLIC_POSTHOG_KEY: 'phc_replace_me',
     NEXT_PUBLIC_POSTHOG_HOST: 'https://us.i.posthog.com',
