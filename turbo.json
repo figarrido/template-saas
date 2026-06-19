@@ -18,6 +18,10 @@
       "cache": false,
       "persistent": true
     },
+    "dev:start": {
+      "cache": false,
+      "persistent": true
+    },
     "lint": {
       "dependsOn": ["^build"],
       "outputs": []

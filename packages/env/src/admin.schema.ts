@@ -34,7 +34,7 @@ export const adminSchema: SurfaceSchema = {
     MAIL_PROVIDER: 'smtp',
     SMTP_HOST: '127.0.0.1',
     SMTP_PORT: '54425',
-    NEXT_PUBLIC_SITE_URL: 'http://localhost:3001',
+    NEXT_PUBLIC_SITE_URL: 'https://admin.template.localhost',
   },
   descriptions: {
     ...sharedDescriptions,

@@ -37,7 +37,7 @@ export const webSchema: SurfaceSchema = {
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_replace_me',
     NEXT_PUBLIC_POSTHOG_KEY: 'phc_replace_me',
     NEXT_PUBLIC_POSTHOG_HOST: 'https://us.i.posthog.com',
-    NEXT_PUBLIC_SITE_URL: 'http://localhost:3000',
+    NEXT_PUBLIC_SITE_URL: 'https://template.localhost',
   },
   descriptions: {
     ...sharedDescriptions,

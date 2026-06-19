@@ -1,0 +1,9 @@
+{
+  "script": "dev:start",
+  "apps": {
+    "apps/web": { "name": "template" },
+    "apps/admin": { "name": "admin.template" },
+    "services/worker-node": { "proxy": false },
+    "services/worker-py": { "proxy": false }
+  }
+}
