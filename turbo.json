@@ -16,7 +16,9 @@
       "passThroughEnv": [
         "SUPABASE_URL",
         "SUPABASE_SERVICE_ROLE_KEY",
-        "ADMIN_DATABASE_URL"
+        "ADMIN_DATABASE_URL",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET"
       ]
     },
     "dev": {
