@@ -11,8 +11,13 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? 'https://template.localhost',
+    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3000',
     trace: 'retain-on-failure',
+  },
+  webServer: {
+    command: 'pnpm start',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 });
