@@ -42,7 +42,17 @@ jobs:
       - run: pnpm -F @template/db test:rls
       - run: pnpm build
         env:
-          SKIP_ENV_VALIDATION: 'true'
+          # Supply local-dev Supabase defaults so apps/admin env validation
+          # doesn't crash during Next.js page-data collection (the worker
+          # Turbo spawns doesn't reliably receive undeclared env vars).
+          # These are the same well-known defaults on every local install —
+          # not production secrets.
+          SUPABASE_URL: 'http://127.0.0.1:54421'
+          NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54421'
+          SUPABASE_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+          ADMIN_DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:54422/postgres'
+          NEXT_PUBLIC_SITE_URL: 'http://localhost:3001'
       # Playwright lands here once apps/* gain E2E suites in Phase 12. Until
       # then `pnpm test:e2e` no-ops cleanly (no surface has the script).
       - run: pnpm -r --filter='./apps/*' test:e2e --if-present
