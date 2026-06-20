@@ -13,7 +13,7 @@ export default defineConfig({
   },
   webServer: {
     command: 'pnpm start',
-    url: 'http://localhost:3001',
+    url: 'http://localhost:3001/api/health',
     reuseExistingServer: !process.env.CI,
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
