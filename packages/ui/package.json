@@ -8,6 +8,8 @@
     "./globals.css": "./src/globals.css",
     "./tailwind.config": "./tailwind.config.ts",
     "./components/*": "./src/components/*.tsx",
+    "./molecules/*": "./src/molecules/*.tsx",
+    "./organisms/*": "./src/organisms/*.tsx",
     "./forms": "./src/forms/index.ts",
     "./theme": "./src/theme/index.tsx",
     "./toast": "./src/toast/index.tsx",
