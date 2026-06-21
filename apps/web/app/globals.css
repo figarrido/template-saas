@@ -1,1 +1,6 @@
 @import '@template/ui/globals.css';
+
+/* To swap fonts: change the variable referenced here and update layout.tsx */
+body {
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
