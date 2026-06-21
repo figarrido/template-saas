@@ -24,6 +24,7 @@
     "@template/flags": "workspace:*",
     "@template/observability": "workspace:*",
     "@template/ui": "workspace:*",
+    "lucide-react": "^0.460.0",
     "@upstash/ratelimit": "^2.0.0",
     "@upstash/redis": "^1.34.0",
     "next": "^15.0.0",
