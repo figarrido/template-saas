@@ -73,8 +73,8 @@ function writeEnvLocal(target: Target, supabase: Map<string, string>): void {
       value = supabase.get('API_URL') ?? supabase.get('SUPABASE_URL') ?? '';
     } else if (v.name === 'SUPABASE_SERVICE_ROLE_KEY') {
       value = supabase.get('SERVICE_ROLE_KEY') ?? '';
-    } else if (v.name === 'NEXT_PUBLIC_SUPABASE_ANON_KEY') {
-      value = supabase.get('ANON_KEY') ?? '';
+    } else if (v.name === 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY') {
+      value = supabase.get('PUBLISHABLE_KEY') ?? '';
     } else if (v.name === 'WORKER_DATABASE_URL' || v.name === 'ADMIN_DATABASE_URL') {
       value = supabase.get('DB_URL') ?? '';
     } else if (v.name === 'SMTP_HOST') {
