@@ -22,6 +22,7 @@
     "db:introspect": "turbo run db:introspect",
     "db:introspect:check": "turbo run db:introspect:check",
     "env:example": "turbo run env:example",
+    "env:local": "tsx scripts/write-env-local.ts",
     "env:example:check": "turbo run env:example:check",
     "jobs:codegen": "turbo run jobs:codegen",
     "jobs:codegen:check": "turbo run jobs:codegen:check",
