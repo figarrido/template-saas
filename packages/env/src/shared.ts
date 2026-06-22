@@ -13,7 +13,7 @@ export const sharedServer = {
 
 export const sharedClient = {
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
 };
 
 export const sharedDescriptions: Record<string, string> = {
@@ -24,7 +24,7 @@ export const sharedDescriptions: Record<string, string> = {
   SENTRY_DSN: 'Sentry DSN. Absent = no-op in any environment.',
   OTEL_EXPORTER_OTLP_ENDPOINT: 'OTel collector endpoint. Absent = stdout / no-op.',
   NEXT_PUBLIC_SUPABASE_URL: 'Supabase URL exposed to the browser.',
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: 'Supabase anon key exposed to the browser (RLS-bound).',
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'Supabase publishable key exposed to the browser (replaces legacy anon key; RLS-bound).',
 };
 
 export const sharedExamples: Record<string, string> = {
@@ -33,5 +33,5 @@ export const sharedExamples: Record<string, string> = {
   SUPABASE_SERVICE_ROLE_KEY: 'eyJ...replace-me',
   SENTRY_DSN: 'https://examplePublicKey@o0.ingest.sentry.io/0',
   NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54421',
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJ...replace-me',
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_replace-me',
 };

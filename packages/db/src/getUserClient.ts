@@ -14,7 +14,7 @@ export type CookieAdapter = {
 
 export type UserClientConfig = {
   supabaseUrl: string;
-  supabaseAnonKey: string;
+  supabasePublishableKey: string;
   cookies: CookieAdapter;
 };
 
@@ -30,7 +30,7 @@ export type UserClientConfig = {
  * docs/architecture/02-data.md § Query layer.
  */
 export function getUserClient(config: UserClientConfig) {
-  return createServerClient<Database>(config.supabaseUrl, config.supabaseAnonKey, {
+  return createServerClient<Database>(config.supabaseUrl, config.supabasePublishableKey, {
     cookies: {
       getAll: () => config.cookies.getAll(),
       setAll: (cookies: CookieToSet[]) => config.cookies.setAll(cookies),

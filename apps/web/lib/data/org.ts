@@ -8,7 +8,7 @@ import { env } from '@template/env/web';
 export const getMyOrganizations = cache(async () => {
   const supabase = getUserClient({
     supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL,
-    supabaseAnonKey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    supabasePublishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     cookies: await cookieAdapter(),
   });
 
