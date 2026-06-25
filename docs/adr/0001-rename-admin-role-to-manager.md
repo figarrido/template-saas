@@ -1,0 +1,3 @@
+# Rename org role `admin` to `manager`
+
+The membership role enum ships as `owner / admin / member`. We renamed `admin` → `manager` because "admin" collides with two other concepts in the same codebase: the `apps/admin` backoffice application and the `admin_users` table that tracks Operators. A sentence like "an admin can invite members" is ambiguous without knowing which admin. `manager` is unambiguous — it describes someone who manages people within an org, which is exactly what the role does. The DB change is a forward migration on the `role` check constraint and any existing rows; now is the cheapest time to make it since no derived project has inherited the old name.
