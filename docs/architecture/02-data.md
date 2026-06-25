@@ -7,7 +7,7 @@
 Data model sketch:
 - `organizations` (organization_id, name, slug, ...)
 - `memberships` (membership_id, user_id, organization_id, role) with unique `(user_id, organization_id)`
-- All tenant-scoped tables carry `organization_id` with RLS policies keyed on `auth.uid()` + membership.
+- All org-scoped tables carry `organization_id` with RLS policies keyed on `auth.uid()` + membership.
 
 **Why:**
 - Standard SaaS pattern; plays directly to Supabase's strengths.
@@ -16,7 +16,7 @@ Data model sketch:
 **Tradeoffs:**
 - RLS policies are easy to get subtly wrong. Mitigated by a dedicated RLS test suite (see [Testing](#testing)).
 - Some queries get slower under RLS; occasionally needs `security definer` functions for hot paths.
-- Cross-tenant analytics for the admin app bypass RLS via the service-role client; never from `apps/web`.
+- Cross-org analytics for the admin app bypass RLS via the service-role client; never from `apps/web`.
 
 **Related:** [03-auth](./03-auth.md), [04-billing](./04-billing.md)
 
@@ -24,7 +24,7 @@ Data model sketch:
 
 ## Query layer
 
-**Decision:** Hybrid. `supabase-js` in `apps/web` (user-context, RLS-honoring). Drizzle with a service-role Postgres connection in `apps/admin` and `services/*` (cross-tenant, complex queries). Types generated from the live schema.
+**Decision:** Hybrid. `supabase-js` in `apps/web` (user-context, RLS-honoring). Drizzle with a service-role Postgres connection in `apps/admin` and `services/*` (cross-org, complex queries). Types generated from the live schema.
 
 **`packages/db` shape:**
 - Exports two named factories — `getUserClient(req)` and `getServiceClient()` — so the security boundary is visible at every call site.
@@ -34,7 +34,7 @@ Data model sketch:
 
 **Why:**
 - Honoring RLS structurally (not by convention) is the highest-leverage decision in this stack. The factory names make the security boundary visible at every call site.
-- Admin and worker queries are legitimately cross-tenant and complex; supabase-js would push call sites into raw RPCs or PostgREST contortions.
+- Admin and worker queries are legitimately cross-org and complex; supabase-js would push call sites into raw RPCs or PostgREST contortions.
 
 **Tradeoffs:**
 - Two clients to maintain. Engineers need to know which to use where — mitigated by the linter and factory names.
@@ -50,7 +50,7 @@ Data model sketch:
 **Decision:**
 
 - **Primary keys: UUID v7** via `uuid_generate_v7()` SQL function (or native `gen_random_uuid()` if Supabase's PG version supports v7 at scaffold time — verify before locking).
-- **PK naming: `<table_singular>_id`** (`organizations.organization_id`, `profiles.user_id`). Enables `JOIN ... USING (organization_id)` throughout the tenant-scoped surface.
+- **PK naming: `<table_singular>_id`** (`organizations.organization_id`, `profiles.user_id`). Enables `JOIN ... USING (organization_id)` throughout the org-scoped surface.
 - **Junction tables (e.g., `memberships`):** surrogate `<junction>_id` PK + unique constraint on the natural key.
 - **`created_at` + `updated_at`** on every table. `DEFAULT now()` + the `moddatetime` Postgres contrib extension trigger.
 - **Soft delete:** column-based (`deleted_at timestamptz null`), opt-in per table. Not defaulted everywhere.
@@ -116,7 +116,7 @@ Data model sketch:
 **Decision:** Vitest (unit/integration) + Playwright (E2E). RLS test suite in `packages/db` is the load-bearing safety net.
 
 **Mechanics:**
-- **RLS test suite:** spins up local Supabase, seeds multi-tenant data, asserts cross-tenant queries fail. Highest-leverage test the template ships.
+- **RLS test suite:** spins up local Supabase, seeds multi-tenant data, asserts cross-org queries fail. Highest-leverage test the template ships.
 - **Migration validation:** CI runs local Supabase per PR with the PR's migrations applied; same infra as the RLS suite.
 - Worker services have their own unit tests (Vitest for Node, pytest for Python).
 - Gate composition lives in [08-platform](./08-platform.md#ci-specifics).
