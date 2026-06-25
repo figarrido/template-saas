@@ -27,9 +27,9 @@
 
 ## Seed data (`supabase/seed.sql`)
 
-- 1 admin user (in `admin_users`).
-- 1 regular user.
-- 1 org with both users as members.
+- 1 Operator (in `admin_users`).
+- 1 regular User.
+- 1 org with both as Members.
 - 1 example plan + entitlement record.
 - 1 example queued job (so the workers visibly do work right after `pnpm dev`).
 - Deliberately small: enough to exercise auth, org/membership, billing, and the job queue end-to-end. Not a fixture buffet.
