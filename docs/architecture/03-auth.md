@@ -12,8 +12,8 @@
 - Admin app lives on a dedicated subdomain (e.g., `admin.example.com`), separate Vercel project. See [01-stack](./01-stack.md).
 
 **Access enforcement (app-layer, ships in template):**
-- Next.js middleware in `apps/admin` enforces, in order: (1) authenticated session, (2) `admin_users` row exists for the user, (3) MFA factor present and verified within the session lifetime. Any failure → 404 (not 403 — admin existence shouldn't be discoverable).
-- `apps/admin` always uses the service-role Supabase client server-side for cross-tenant queries; never the user's JWT. This is the single legitimate place service-role appears outside of the worker services.
+- Next.js middleware in `apps/admin` enforces, in order: (1) authenticated session, (2) `admin_users` row exists for the user (an **Operator** — a User with backoffice access, tracked separately from org memberships), (3) MFA factor present and verified within the session lifetime. Any failure → 404 (not 403 — admin existence shouldn't be discoverable).
+- `apps/admin` always uses the service-role Supabase client server-side for cross-org queries; never the user's JWT. This is the single legitimate place service-role appears outside of the worker services.
 - Audit log: every state-changing admin action writes to an append-only `admin_audit_log` table (actor, target, action, before/after diff, timestamp, IP).
 
 **Edge controls (vendor-specific, NOT in template — recipes only):**
@@ -50,12 +50,12 @@
 
 ## Onboarding & invitation flows
 
-**Decision:** Ship wired flows. `profiles` table 1:1 with `auth.users`. Multi-org with login-time picker. Signed-token email invites. Role enum (`owner` / `admin` / `member`) with a central `can(membership, action)` helper.
+**Decision:** Ship wired flows. `profiles` table 1:1 with `auth.users`. Multi-org with login-time picker. Signed-token email invites. Role enum (`owner` / `manager` / `member`) with a central `can(membership, action)` helper.
 
 ### Data model
 
 - **`profiles`** — PK `user_id` (FK to `auth.users.id`, `ON DELETE CASCADE`). Holds `display_name`, `avatar_url`, `locale`, `timezone`, marketing prefs. Created by a `handle_new_user()` trigger on `auth.users` insert (Supabase's standard pattern — we don't own the `auth` schema).
-- **`memberships`** — surrogate `membership_id` PK + unique `(user_id, organization_id)`. `role` column constrained to `owner` / `admin` / `member` via enum or check constraint.
+- **`memberships`** — surrogate `membership_id` PK + unique `(user_id, organization_id)`. `role` column constrained to `owner` / `manager` / `member` via enum or check constraint. (The role formerly named `admin` is `manager` — see [ADR 0001](../adr/0001-rename-admin-role-to-manager.md) — to avoid collision with `apps/admin` and `admin_users`.)
 - **`invitations`** — `invitation_id, organization_id, email, role, token_hash, expires_at, accepted_at, invited_by`. 7-day TTL default.
 
 ### Flows
