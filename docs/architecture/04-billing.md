@@ -6,7 +6,7 @@
 
 ### Charging side
 
-- `packages/billing` exports a provider-neutral domain model: `Customer`, `Subscription`, `Plan`, `Price`, `Invoice`, `PaymentMethod`, `UsageEvent`, and lifecycle events (`subscription.created`, `subscription.updated`, `subscription.canceled`, `invoice.paid`, `invoice.failed`, ...).
+- `packages/billing` exports a provider-neutral domain model: `BillingAccount`, `Subscription`, `Plan`, `Price`, `Charge`, `PaymentMethod`, `UsageEvent`, and lifecycle events (`subscription.created`, `subscription.updated`, `subscription.canceled`, `charge.paid`, `charge.failed`, ...). The provider's own "Customer" object is adapter-internal and maps to a `BillingAccount` (the link between an Organization and one provider); "Customer" is not a domain term — the entity being billed is the Organization.
 - A `BillingProvider` interface defines the operations: `createCheckoutSession`, `createCustomerPortalSession`, `getSubscription`, `cancelSubscription`, `reportUsage`, `verifyWebhook`, `normalizeWebhookEvent` (→ canonical domain event).
 - Concrete adapters live in `packages/billing/providers/*`. The template ships `providers/stripe` as the reference; derived projects add their own (`providers/fintoc`, `providers/webpay`, ...) without modifying the package.
 - A **provider registry + router** selects which provider to use per call. Routing inputs: the org's region/country, the rail type (bank transfer vs. card), the org's currently-attached provider account, an explicit override, or a feature flag. An org carries a `billing_accounts` table (one row per provider) so a single org can be connected to multiple providers simultaneously.
@@ -14,10 +14,10 @@
 
 ### Tax-document side (separate from charging)
 
-- `Invoice` (internal billing record) is **distinct** from `TaxDocument` (the legal e-invoice — boleta/factura in Chile, NF-e in Brazil, GST invoice in India, etc.).
+- `Charge` (internal billing record) is **distinct** from `Invoice` (the legal e-invoice — boleta/factura in Chile, NF-e in Brazil, GST invoice in India, etc.).
 - An `EmitterProvider` interface handles tax-document emission: `emit`, `void`, `getStatus`. **No concrete emitter ships in the template** — derived projects add what their jurisdiction needs.
-- The canonical `billing.invoice.paid` event triggers emission as a separate step. Charging adapter and emitter adapter are independently swappable.
-- `TaxDocument` rows in the DB carry the legal document reference (folio/number), document type, status, and a link to the `Invoice` they belong to. The schema and event flow are template-level; the actual emission is product-level.
+- The canonical `billing.charge.paid` event triggers emission as a separate step. Charging adapter and emitter adapter are independently swappable.
+- `Invoice` rows in the DB carry the legal document reference (folio/number), document type, status, and a link to the `Charge` they belong to. The schema and event flow are template-level; the actual emission is product-level.
 - If a derived product is in a jurisdiction without e-invoicing mandates (e.g., US-only), it simply doesn't register an emitter — the seam exists but is unused, costing nothing.
 
 ### Plans and entitlements
@@ -45,7 +45,7 @@
 - **The interface is only as good as the adapters that exercise it.** With just Stripe in the template, there's a real risk the abstraction encodes Stripe assumptions invisibly. Mitigation: when the *first* derived project adds its second adapter, expect to refactor the interface — and treat that as the moment the abstraction is actually validated.
 - **Conformance test suite ships in the template.** Each adapter implements the same conformance suite. Without it, each new adapter is a discovery exercise.
 - **Tax handling is provider-shaped.** Stripe is not a Merchant of Record (Stripe Tax helps but isn't MoR). The `EmitterProvider` layer is how derived products close that gap.
-- **"Charge succeeded, tax document failed"** is a real and legally-fraught state in any e-invoicing jurisdiction. The job-queue integration (see [05-jobs](./05-jobs.md)) handles emission retries durably with high max-attempts; the template ships a generic "needs manual intervention" admin view in `apps/admin` parameterized on `TaxDocument.status`.
+- **"Charge paid, Invoice emission failed"** is a real and legally-fraught state in any e-invoicing jurisdiction. The job-queue integration (see [05-jobs](./05-jobs.md)) handles emission retries durably with high max-attempts; the template ships a generic "needs manual intervention" admin view in `apps/admin` parameterized on `Invoice.status`.
 
 **Related:** [02-data](./02-data.md), [05-jobs](./05-jobs.md), [09-api-boundary](./09-api-boundary.md)
 
