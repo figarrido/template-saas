@@ -81,9 +81,9 @@ middleware.ts  auth, active-org, CSP nonce, rate-limit
 ### Data access — RLS is structural
 
 - **`apps/web` uses `getUserClient(req)`** (supabase-js, RLS-honoring). Never service-role.
-- **`apps/admin` and `services/*` use `getServiceClient()`** (Drizzle + service role) for cross-tenant queries.
-- **ESLint forbids importing `getServiceClient` from `apps/web/**`.** If you propose code there that needs cross-tenant access, you're doing it wrong — push the operation behind an RPC or a worker job.
-- All tenant-scoped tables carry `organization_id`. RLS policies key on `auth.uid()` + `memberships`.
+- **`apps/admin` and `services/*` use `getServiceClient()`** (Drizzle + service role) for cross-org queries.
+- **ESLint forbids importing `getServiceClient` from `apps/web/**`.** If you propose code there that needs cross-org access, you're doing it wrong — push the operation behind an RPC or a worker job.
+- All org-scoped tables carry `organization_id`. RLS policies key on `auth.uid()` + `memberships`.
 
 ### Schema conventions
 
@@ -115,7 +115,7 @@ middleware.ts  auth, active-org, CSP nonce, rate-limit
 - Supabase Auth, **email/password only by default**. OAuth wired but disabled.
 - Admin enforcement (in order): authenticated session → `admin_users` row → MFA verified. Failure → **404, not 403**.
 - All admin mutations write to `admin_audit_log`.
-- Multi-org from day one — `profiles` (1:1 with `auth.users`), `memberships`, `invitations`, `active_organization_id` cookie. Roles: `owner` / `admin` / `member`. Central `can(membership, action)` helper in `packages/auth`.
+- Multi-org from day one — `profiles` (1:1 with `auth.users`), `memberships`, `invitations`, `active_organization_id` cookie. Roles: `owner` / `manager` / `member` (the `admin` role was renamed to `manager` — see [ADR 0001](docs/adr/0001-rename-admin-role-to-manager.md)). Central `can(membership, action)` helper in `packages/auth`.
 
 ### Billing
 
@@ -123,7 +123,7 @@ middleware.ts  auth, active-org, CSP nonce, rate-limit
 
 - **Charging and tax-document emission are separate concerns.** `BillingProvider` and `EmitterProvider` interfaces.
 - Only `providers/stripe` ships. **No emitter adapter ships.**
-- `Invoice` (internal) ≠ `TaxDocument` (legal e-invoice). Both modeled at template level; emission happens on `billing.invoice.paid`.
+- `Charge` (internal billing record) ≠ `Invoice` (legal e-invoice). Both modeled at template level; emission happens on `billing.charge.paid`. ("Customer" is adapter-internal; the entity billed is the Organization, linked per-provider via `BillingAccount`.)
 - Plans/entitlements live in DB; provider price IDs map *to* internal plan IDs.
 - `packages/billing` is `0.x.y` until the first non-Stripe adapter exists. Pin exact versions in derived projects.
 
@@ -196,7 +196,7 @@ middleware.ts  auth, active-org, CSP nonce, rate-limit
 - **`pnpm dev`** — turbo runs `apps/web`, `apps/admin`, both workers in parallel.
 - **`pnpm dev:webhooks`** — `stripe listen --forward-to localhost:3000/api/webhooks/billing/stripe`.
 - **`pnpm db:reset`** / **`pnpm db:types`** — Supabase reset / regen types.
-- Seed in `supabase/seed.sql`: 1 admin, 1 user, 1 org with both as members, 1 plan/entitlement, 1 queued job. Deliberately small.
+- Seed in `supabase/seed.sql`: 1 Operator, 1 user, 1 org with both as members, 1 plan/entitlement, 1 queued job. Deliberately small.
 - Sentry no-ops locally; PostHog no-ops if `POSTHOG_KEY` absent.
 
 ---
