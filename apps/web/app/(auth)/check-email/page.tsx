@@ -10,18 +10,13 @@ import { ResendVerificationButton } from './resend-button.js';
 
 type SearchParams = { email?: string | string[] };
 
-function singleEmail(searchParams: SearchParams): string | undefined {
-  const value = searchParams.email;
-  if (typeof value === 'string' && value.includes('@')) return value;
-  return undefined;
-}
-
 export default async function CheckEmailPage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const email = singleEmail(await searchParams);
+  const raw = (await searchParams).email;
+  const email = typeof raw === 'string' && raw.includes('@') ? raw : undefined;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-6">

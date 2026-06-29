@@ -5,17 +5,12 @@ import { LoginForm } from './login-form.js';
 
 type SearchParams = { confirm?: string | string[] };
 
-function showInvalidConfirm(searchParams: SearchParams): boolean {
-  const v = searchParams.confirm;
-  return typeof v === 'string' && v === 'invalid';
-}
-
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const invalid = showInvalidConfirm(await searchParams);
+  const invalid = (await searchParams).confirm === 'invalid';
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 p-6">

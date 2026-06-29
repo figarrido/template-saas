@@ -113,12 +113,7 @@ export function buildAuthEmail(
       return {
         to: user.email,
         from: config.from,
-        subject:
-          type === 'email_change'
-            ? 'Confirm your new email address'
-            : type === 'invite'
-              ? "You've been invited"
-              : 'Confirm your email',
+        subject: verifySubject(type),
         react: VerifyEmail({ verifyUrl: confirmUrl }),
       };
     case 'recovery':
@@ -130,6 +125,17 @@ export function buildAuthEmail(
       };
     default:
       return null;
+  }
+}
+
+function verifySubject(type: 'signup' | 'invite' | 'email_change' | 'magiclink'): string {
+  switch (type) {
+    case 'email_change':
+      return 'Confirm your new email address';
+    case 'invite':
+      return "You've been invited";
+    default:
+      return 'Confirm your email';
   }
 }
 

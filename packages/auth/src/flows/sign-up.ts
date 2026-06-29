@@ -70,5 +70,6 @@ export async function signUp(
 function isWeakPasswordError(error: { code?: string | undefined; message?: string }): boolean {
   if (error.code === 'weak_password') return true;
   // Older supabase-js versions only expose the string. Match defensively.
-  return typeof error.message === 'string' && /password/i.test(error.message) && /(weak|breach|short|leaked|pwned)/i.test(error.message);
+  const message = error.message ?? '';
+  return /password/i.test(message) && /(weak|breach|short|leaked|pwned)/i.test(message);
 }
