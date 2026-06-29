@@ -1,7 +1,7 @@
 import { changePasswordSchema, type ChangePasswordInput } from '../schemas.js';
 import { isWeakPasswordError } from './errors.js';
-import { hasEmailIdentity } from './identity.js';
 import { AUTH_MESSAGES } from './messages.js';
+import { getAuthenticatedUser, reauthenticateUser } from './reauth.js';
 import type { ActionResult, AuthClient } from './types.js';
 
 export type ChangePasswordResult = ActionResult<{ message: string }>;
@@ -39,33 +39,15 @@ export async function changePassword(
     };
   }
 
-  const { data: userData, error: userError } = await client.auth.getUser();
-  if (userError || !userData?.user?.email) {
-    return { ok: false, error: AUTH_MESSAGES.unexpected, code: 'unexpected' };
-  }
+  const authResult = await getAuthenticatedUser(client);
+  if (!authResult.ok) return authResult;
 
-  if (!hasEmailIdentity(userData.user)) {
-    return {
-      ok: false,
-      error: AUTH_MESSAGES.noPasswordIdentity,
-      code: 'no-password-identity',
-    };
-  }
-
-  // Silent re-auth — same user, same client. On success Supabase refreshes
-  // the Session for the same User, which is a no-op from the UI's POV.
-  const { error: reauthError } = await client.auth.signInWithPassword({
-    email: userData.user.email,
-    password: parsed.data.currentPassword,
-  });
-
-  if (reauthError) {
-    return {
-      ok: false,
-      error: AUTH_MESSAGES.reauthFailed,
-      code: 'invalid-credentials',
-    };
-  }
+  const reauthResult = await reauthenticateUser(
+    client,
+    authResult.user,
+    parsed.data.currentPassword,
+  );
+  if (!reauthResult.ok) return reauthResult;
 
   const { error: updateError } = await client.auth.updateUser({
     password: parsed.data.newPassword,

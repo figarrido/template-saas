@@ -1,6 +1,6 @@
 import { changeEmailSchema, type ChangeEmailInput } from '../schemas.js';
-import { hasEmailIdentity } from './identity.js';
 import { AUTH_MESSAGES } from './messages.js';
+import { getAuthenticatedUser, reauthenticateUser } from './reauth.js';
 import type { ActionResult, AuthClient } from './types.js';
 
 export type ChangeEmailResult = ActionResult<{ message: string }>;
@@ -60,40 +60,23 @@ export async function changeEmail(
     };
   }
 
-  const { data: userData, error: userError } = await client.auth.getUser();
-  if (userError || !userData?.user?.email) {
-    return { ok: false, error: AUTH_MESSAGES.unexpected, code: 'unexpected' };
-  }
+  const authResult = await getAuthenticatedUser(client);
+  if (!authResult.ok) return authResult;
 
   // The schema lowercases / trims the new email, so a same-address check
   // is just a direct comparison against the (already lowercased) current
-  // email Supabase stores.
-  if (parsed.data.newEmail === userData.user.email.toLowerCase()) {
+  // email Supabase stores. Bail here — before the silent re-auth — so the
+  // form gives an actionable error without burning a round-trip.
+  if (parsed.data.newEmail === authResult.user.email.toLowerCase()) {
     return { ok: false, error: AUTH_MESSAGES.emailUnchanged, code: 'invalid-input' };
   }
 
-  if (!hasEmailIdentity(userData.user)) {
-    return {
-      ok: false,
-      error: AUTH_MESSAGES.noPasswordIdentity,
-      code: 'no-password-identity',
-    };
-  }
-
-  // Silent re-auth — same user, same client. On success Supabase refreshes
-  // the Session for the same User, which is a no-op from the UI's POV.
-  const { error: reauthError } = await client.auth.signInWithPassword({
-    email: userData.user.email,
-    password: parsed.data.currentPassword,
-  });
-
-  if (reauthError) {
-    return {
-      ok: false,
-      error: AUTH_MESSAGES.reauthFailed,
-      code: 'invalid-credentials',
-    };
-  }
+  const reauthResult = await reauthenticateUser(
+    client,
+    authResult.user,
+    parsed.data.currentPassword,
+  );
+  if (!reauthResult.ok) return reauthResult;
 
   const { error: updateError } = options.emailRedirectTo
     ? await client.auth.updateUser(
