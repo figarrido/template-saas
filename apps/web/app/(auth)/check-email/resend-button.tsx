@@ -23,23 +23,17 @@ export function ResendVerificationButton({ email }: { email?: string }) {
     else toast.error(result.error);
   }
 
-  if (email) {
-    return (
-      <Button type="button" variant="outline" onClick={onResend} disabled={submitting}>
-        {submitting ? 'Sending…' : 'Resend confirmation email'}
-      </Button>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-2">
-      <Input
-        type="email"
-        placeholder="you@example.com"
-        autoComplete="email"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-      />
+      {email ? null : (
+        <Input
+          type="email"
+          placeholder="you@example.com"
+          autoComplete="email"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+      )}
       <Button type="button" variant="outline" onClick={onResend} disabled={submitting || !value}>
         {submitting ? 'Sending…' : 'Resend confirmation email'}
       </Button>

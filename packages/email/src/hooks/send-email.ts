@@ -89,7 +89,7 @@ export async function handleSendEmailHook(
   }
 
   await config.provider.send(message);
-  return { ok: true, sent: { to: message.to as string, subject: message.subject } };
+  return { ok: true, sent: { to: payload.user.email, subject: message.subject } };
 }
 
 /**
@@ -194,12 +194,8 @@ function decodeWebhookSecret(secret: string): Buffer | null {
 }
 
 function safeBase64Decode(value: string): Buffer | null {
-  try {
-    const buf = Buffer.from(value, 'base64');
-    // Reject obviously bogus values — Buffer.from doesn't throw on non-b64.
-    if (buf.length === 0) return null;
-    return buf;
-  } catch {
-    return null;
-  }
+  // Buffer.from silently drops non-base64 chars rather than throwing, so an
+  // empty buffer is the only signal that the input was unusable.
+  const buf = Buffer.from(value, 'base64');
+  return buf.length === 0 ? null : buf;
 }

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { z } from 'zod';
 import {
@@ -24,12 +23,10 @@ type Values = z.infer<typeof signUpSchema>;
 export function SignUpForm() {
   const router = useRouter();
   const form = useZodForm(signUpSchema);
-  const [submitting, setSubmitting] = useState(false);
+  const submitting = form.formState.isSubmitting;
 
   async function onSubmit(values: Values) {
-    setSubmitting(true);
     const result = await signUpAction(values);
-    setSubmitting(false);
 
     if (!result.ok) {
       toast.error(result.error);
