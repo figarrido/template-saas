@@ -11,11 +11,8 @@ export type Destination =
   | { kind: 'picker'; path: '/orgs' };
 
 export function destinationForOrganizations(orgs: ReadonlyArray<OrgRef>): Destination {
-  if (orgs.length === 0) return { kind: 'onboarding', path: '/onboarding/first-org' };
-  if (orgs.length === 1) {
-    const [only] = orgs;
-    if (!only) return { kind: 'onboarding', path: '/onboarding/first-org' };
-    return { kind: 'dashboard', path: `/${only.slug}/dashboard`, orgSlug: only.slug };
-  }
+  const [first, second] = orgs;
+  if (!first) return { kind: 'onboarding', path: '/onboarding/first-org' };
+  if (!second) return { kind: 'dashboard', path: `/${first.slug}/dashboard`, orgSlug: first.slug };
   return { kind: 'picker', path: '/orgs' };
 }
