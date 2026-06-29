@@ -4,6 +4,8 @@ import { signIn } from '../src/flows/sign-in.js';
 import { signOut } from '../src/flows/sign-out.js';
 import { signUp } from '../src/flows/sign-up.js';
 import { resendVerification } from '../src/flows/resend-verification.js';
+import { requestPasswordReset } from '../src/flows/request-password-reset.js';
+import { updatePassword } from '../src/flows/update-password.js';
 import { verifyEmailToken, isEmailOtpType } from '../src/flows/verify-email.js';
 
 // Unit tests with a fake supabase client. The full round-trip against local
@@ -24,6 +26,12 @@ function fakeClient(opts: {
     options?: { emailRedirectTo?: string };
   }) => Promise<unknown>;
   verifyOtp?: (args: { type: string; token_hash: string }) => Promise<unknown>;
+  resetPasswordForEmail?: (
+    email: string,
+    options?: { redirectTo?: string },
+  ) => Promise<unknown>;
+  updateUser?: (args: { password?: string }) => Promise<unknown>;
+  getSession?: () => Promise<{ data: { session: unknown }; error: unknown }>;
 }): AuthClient {
   return {
     auth: {
@@ -33,6 +41,11 @@ function fakeClient(opts: {
       resend: opts.resend ?? (async () => ({})),
       signUp: opts.signUp ?? (async () => ({ data: { user: null, session: null }, error: null })),
       verifyOtp: opts.verifyOtp ?? (async () => ({ data: { user: null, session: null }, error: null })),
+      resetPasswordForEmail: opts.resetPasswordForEmail ?? (async () => ({ data: {}, error: null })),
+      updateUser: opts.updateUser ?? (async () => ({ data: { user: { id: 'u' } }, error: null })),
+      getSession:
+        opts.getSession ??
+        (async () => ({ data: { session: { access_token: 't' } }, error: null })),
     },
   } as unknown as AuthClient;
 }
@@ -295,6 +308,178 @@ describe('verifyEmailToken flow', () => {
     expect(isEmailOtpType('email_change')).toBe(true);
     expect(isEmailOtpType('not-a-real-type')).toBe(false);
     expect(isEmailOtpType(undefined)).toBe(false);
+  });
+});
+
+describe('requestPasswordReset flow', () => {
+  it('returns the generic "if an account exists..." message and forwards the email to Supabase', async () => {
+    const calls: Array<{ email: string; options?: { redirectTo?: string } }> = [];
+    const client = fakeClient({
+      resetPasswordForEmail: async (email, options) => {
+        calls.push({ email, options });
+        return { data: {}, error: null };
+      },
+    });
+
+    const result = await requestPasswordReset(client, { email: 'someone@example.com' });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.message).toMatch(/if an account exists/i);
+    expect(calls).toEqual([{ email: 'someone@example.com', options: undefined }]);
+  });
+
+  it('forwards the redirectTo option so the recovery link lands on /auth/confirm', async () => {
+    let received: { redirectTo?: string } | undefined;
+    const client = fakeClient({
+      resetPasswordForEmail: async (_email, options) => {
+        received = options;
+        return { data: {}, error: null };
+      },
+    });
+
+    await requestPasswordReset(
+      client,
+      { email: 'someone@example.com' },
+      { redirectTo: 'https://x.test/auth/confirm' },
+    );
+
+    expect(received).toEqual({ redirectTo: 'https://x.test/auth/confirm' });
+  });
+
+  it('returns the SAME generic shape when the email is malformed (no validation-error leak)', async () => {
+    const calls: Array<unknown> = [];
+    const client = fakeClient({
+      resetPasswordForEmail: async (email, options) => {
+        calls.push({ email, options });
+        return { data: {}, error: null };
+      },
+    });
+
+    const result = await requestPasswordReset(client, { email: 'not-an-email' });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.message).toMatch(/if an account exists/i);
+    // Malformed input is dropped on the floor — never hits Supabase.
+    expect(calls).toHaveLength(0);
+  });
+
+  it('still returns the generic shape when Supabase returns an error (no enumeration via failure)', async () => {
+    const client = fakeClient({
+      resetPasswordForEmail: async () => ({ data: null, error: { message: 'rate limit' } }),
+    });
+
+    const result = await requestPasswordReset(client, { email: 'someone@example.com' });
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe('updatePassword flow', () => {
+  const NEW_PASSWORD = 'fresh-horse-battery-staple';
+
+  it('updates the password, revokes other Sessions, and keeps the current device signed in', async () => {
+    const calls: Array<{ fn: string; args: unknown }> = [];
+    const client = fakeClient({
+      getSession: async () => ({
+        data: { session: { access_token: 'recovery-jwt' } },
+        error: null,
+      }),
+      updateUser: async (args) => {
+        calls.push({ fn: 'updateUser', args });
+        return { data: { user: { id: 'user-1' } }, error: null };
+      },
+      signOut: async (args) => {
+        calls.push({ fn: 'signOut', args });
+        return { error: null };
+      },
+    });
+
+    const result = await updatePassword(client, { password: NEW_PASSWORD });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.message).toMatch(/updated/i);
+    expect(calls).toEqual([
+      { fn: 'updateUser', args: { password: NEW_PASSWORD } },
+      { fn: 'signOut', args: { scope: 'others' } },
+    ]);
+  });
+
+  it('rejects too-short passwords with invalid-input (shared policy with sign-up)', async () => {
+    let updateCalls = 0;
+    const client = fakeClient({
+      updateUser: async () => {
+        updateCalls++;
+        return { data: { user: { id: 'u' } }, error: null };
+      },
+    });
+    const result = await updatePassword(client, { password: 'short' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid-input');
+    expect(updateCalls).toBe(0);
+  });
+
+  it('rejects the call (without revoking) when no Session is present — link expired or never landed', async () => {
+    let signOutCalls = 0;
+    const client = fakeClient({
+      getSession: async () => ({ data: { session: null }, error: null }),
+      signOut: async () => {
+        signOutCalls++;
+        return { error: null };
+      },
+    });
+    const result = await updatePassword(client, { password: NEW_PASSWORD });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid-credentials');
+    expect(result.error).toMatch(/no longer valid/i);
+    expect(signOutCalls).toBe(0);
+  });
+
+  it('surfaces Supabase weak_password (HIBP) as a clear invalid-input error', async () => {
+    const client = fakeClient({
+      updateUser: async () => ({
+        data: { user: null },
+        error: {
+          code: 'weak_password',
+          message: 'Password has been found in breach databases.',
+        },
+      }),
+    });
+    const result = await updatePassword(client, { password: NEW_PASSWORD });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid-input');
+    expect(result.error).toMatch(/password/i);
+  });
+
+  it('maps an AuthSessionMissingError from updateUser to the recovery-session-missing branch', async () => {
+    const client = fakeClient({
+      updateUser: async () => ({
+        data: { user: null },
+        error: { name: 'AuthSessionMissingError', message: 'Auth session missing!' },
+      }),
+    });
+    const result = await updatePassword(client, { password: NEW_PASSWORD });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid-credentials');
+    expect(result.error).toMatch(/no longer valid/i);
+  });
+
+  it('maps an unexpected updateUser error to the unexpected branch', async () => {
+    const client = fakeClient({
+      updateUser: async () => ({
+        data: { user: null },
+        error: { code: 'over_request_rate_limit', message: 'too many' },
+      }),
+    });
+    const result = await updatePassword(client, { password: NEW_PASSWORD });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('unexpected');
   });
 });
 

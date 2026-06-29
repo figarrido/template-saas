@@ -4,20 +4,26 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import {
   destinationForOrganizations,
+  requestPasswordReset,
   resendVerification,
   signIn,
   signInOAuth,
   signOut,
   signUp,
+  updatePassword,
   type OAuthProvider,
+  type RequestPasswordResetInput,
+  type RequestPasswordResetResult,
+  type ResendVerificationInput,
   type ResendVerificationResult,
+  type SignInInput,
   type SignInOAuthResult,
   type SignInResult,
   type SignOutResult,
-  type SignUpResult,
-  type SignInInput,
   type SignUpInput,
-  type ResendVerificationInput,
+  type SignUpResult,
+  type UpdatePasswordInput,
+  type UpdatePasswordResult,
 } from '@template/auth';
 import { env } from '@template/env/web';
 import { getRequestClient } from '@/lib/supabase/server';
@@ -53,6 +59,26 @@ export async function resendVerificationAction(
 ): Promise<ResendVerificationResult> {
   const client = await getRequestClient();
   return resendVerification(client, input);
+}
+
+export async function requestPasswordResetAction(
+  input: RequestPasswordResetInput,
+): Promise<RequestPasswordResetResult> {
+  const client = await getRequestClient();
+  return requestPasswordReset(client, input, {
+    // Recovery links use the `{{ .TokenHash }}` template style — Supabase
+    // appends `?token_hash=…&type=recovery` to this URL. /auth/confirm
+    // verifies the token, writes the Session cookies, and 303s the User
+    // to /reset-password.
+    redirectTo: `${env.NEXT_PUBLIC_SITE_URL}/auth/confirm`,
+  });
+}
+
+export async function updatePasswordAction(
+  input: UpdatePasswordInput,
+): Promise<UpdatePasswordResult> {
+  const client = await getRequestClient();
+  return updatePassword(client, input);
 }
 
 /**

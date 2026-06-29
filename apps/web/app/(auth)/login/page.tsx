@@ -33,6 +33,11 @@ export default async function LoginPage({
           ) : null}
           <LoginForm />
           <OAuthButtons />
+          <p className="text-muted-foreground text-sm">
+            <Link className="underline" href="/forgot-password">
+              Forgot your password?
+            </Link>
+          </p>
         </CardContent>
       </Card>
     </main>

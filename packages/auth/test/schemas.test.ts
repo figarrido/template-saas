@@ -6,6 +6,8 @@ import {
   signInSchema,
   signInPasswordSchema,
   signUpSchema,
+  requestPasswordResetSchema,
+  updatePasswordSchema,
 } from '../src/schemas.js';
 
 describe('emailSchema', () => {
@@ -73,5 +75,28 @@ describe('signUpSchema', () => {
         password: 'x'.repeat(PASSWORD_POLICY.minLength),
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('requestPasswordResetSchema', () => {
+  it('normalises the email like the sign-in schema', () => {
+    const parsed = requestPasswordResetSchema.parse({ email: '  Foo@Bar.CO ' });
+    expect(parsed).toEqual({ email: 'foo@bar.co' });
+  });
+
+  it('rejects malformed emails — but the flow swallows the failure into the generic success shape', () => {
+    expect(requestPasswordResetSchema.safeParse({ email: 'not-an-email' }).success).toBe(false);
+  });
+});
+
+describe('updatePasswordSchema', () => {
+  it('shares the policy length with sign-up — too-short rejected', () => {
+    const short = 'x'.repeat(PASSWORD_POLICY.minLength - 1);
+    expect(updatePasswordSchema.safeParse({ password: short }).success).toBe(false);
+  });
+
+  it('accepts a policy-compliant password (HIBP is enforced server-side)', () => {
+    const ok = 'x'.repeat(PASSWORD_POLICY.minLength);
+    expect(updatePasswordSchema.safeParse({ password: ok }).success).toBe(true);
   });
 });

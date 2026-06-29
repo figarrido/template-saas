@@ -1,4 +1,5 @@
 import { signUpSchema, type SignUpInput } from '../schemas.js';
+import { isWeakPasswordError } from './errors.js';
 import { AUTH_MESSAGES } from './messages.js';
 import type { ActionResult, AuthClient } from './types.js';
 
@@ -65,11 +66,4 @@ export async function signUp(
   // Any `data.session` is dropped on the floor — sign-up never produces an
   // active Session because verification is required first.
   return { ok: true, data: { message: AUTH_MESSAGES.checkYourEmail } };
-}
-
-function isWeakPasswordError(error: { code?: string | undefined; message?: string }): boolean {
-  if (error.code === 'weak_password') return true;
-  // Older supabase-js versions only expose the string. Match defensively.
-  const message = error.message ?? '';
-  return /password/i.test(message) && /(weak|breach|short|leaked|pwned)/i.test(message);
 }

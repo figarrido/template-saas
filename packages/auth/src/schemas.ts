@@ -39,6 +39,22 @@ export const resendVerificationSchema = z.object({
   email: emailSchema,
 });
 
+// Forgot-password: just the address. The flow always returns the generic
+// "if an account exists..." response so a validation failure has the same
+// shape as a success.
+export const requestPasswordResetSchema = z.object({
+  email: emailSchema,
+});
+
+// Reset-password: a new password that satisfies the shared policy. The
+// User is identified by the recovery Session that the /auth/confirm route
+// established when verifying the token_hash, so no email is required here.
+export const updatePasswordSchema = z.object({
+  password: passwordSchema,
+});
+
 export type SignInInput = z.infer<typeof signInSchema>;
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;
+export type RequestPasswordResetInput = z.infer<typeof requestPasswordResetSchema>;
+export type UpdatePasswordInput = z.infer<typeof updatePasswordSchema>;

@@ -3,6 +3,12 @@ export { signOut, type SignOutResult } from './sign-out.js';
 export { signUp, type SignUpResult, type SignUpOptions } from './sign-up.js';
 export { resendVerification, type ResendVerificationResult } from './resend-verification.js';
 export {
+  requestPasswordReset,
+  type RequestPasswordResetResult,
+  type RequestPasswordResetOptions,
+} from './request-password-reset.js';
+export { updatePassword, type UpdatePasswordResult } from './update-password.js';
+export {
   verifyEmailToken,
   isEmailOtpType,
   EMAIL_OTP_TYPES,
