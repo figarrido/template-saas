@@ -7,15 +7,27 @@
     ".": "./src/index.ts",
     "./can": "./src/can.ts",
     "./providers": "./src/providers.ts",
-    "./middleware": "./src/middleware-helpers.ts"
+    "./middleware": "./src/middleware-helpers.ts",
+    "./flows": "./src/flows/index.ts",
+    "./schemas": "./src/schemas.ts",
+    "./policy": "./src/policy.ts"
   },
   "scripts": {
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "zod": "^3.23.0"
+  },
+  "peerDependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  },
   "devDependencies": {
+    "@supabase/supabase-js": "^2.45.0",
     "@template/config": "workspace:*",
     "@types/node": "^22.0.0",
+    "postgres": "^3.4.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   }

@@ -1,41 +1,54 @@
 'use server';
 
-import { cookies } from 'next/headers';
-import { z } from 'zod';
-import { getUserClient } from '@template/db';
-import { env } from '@template/env/web';
+import { redirect } from 'next/navigation';
+import {
+  destinationForOrganizations,
+  resendVerification,
+  signIn,
+  signOut,
+  type ResendVerificationResult,
+  type SignInResult,
+  type SignOutResult,
+  type SignInInput,
+  type ResendVerificationInput,
+} from '@template/auth';
+import { getRequestClient } from '@/lib/supabase/server';
+import { getMyOrganizations } from '@/lib/data/org';
 
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
-});
+// docs/architecture/09-api-boundary.md § Server Actions:
+// Server Actions in apps/web are thin adapters. They build the cookie-bound
+// Supabase client and delegate to the injectable flow functions in
+// packages/auth so the same logic is exercised by the integration tests.
 
-type ActionResult<T = void> = { ok: true; data: T } | { ok: false; error: string };
-
-export async function loginAction(
-  input: z.infer<typeof loginSchema>,
-): Promise<ActionResult<{ userId: string }>> {
-  const parsed = loginSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: 'Invalid email or password' };
-
-  const supabase = getUserClient({
-    supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL,
-    supabasePublishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-    cookies: await cookieAdapter(),
-  });
-
-  const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error || !data.user) return { ok: false, error: error?.message ?? 'Sign-in failed' };
-
-  return { ok: true, data: { userId: data.user.id } };
+export async function loginAction(input: SignInInput): Promise<SignInResult> {
+  const client = await getRequestClient();
+  return signIn(client, input);
 }
 
-async function cookieAdapter() {
-  const cookieStore = await cookies();
-  return {
-    getAll: () => cookieStore.getAll(),
-    setAll: (cs: { name: string; value: string; options?: Record<string, unknown> }[]) => {
-      for (const c of cs) cookieStore.set(c.name, c.value, c.options ?? {});
-    },
-  };
+export async function logoutAction(): Promise<SignOutResult> {
+  const client = await getRequestClient();
+  return signOut(client);
+}
+
+export async function resendVerificationAction(
+  input: ResendVerificationInput,
+): Promise<ResendVerificationResult> {
+  const client = await getRequestClient();
+  return resendVerification(client, input);
+}
+
+/**
+ * Resolves the post-sign-in destination and redirects. Called from the
+ * login form after a successful `loginAction`. Routes by Organization
+ * count: 0 → onboarding stub, 1 → that org's dashboard, 2+ → picker.
+ * docs/architecture/03-auth.md § First-login routing.
+ */
+export async function routeAfterLoginAction(): Promise<void> {
+  const memberships = await getMyOrganizations();
+  const orgs = memberships
+    .map((m) => (m.organizations ? { slug: m.organizations.slug } : null))
+    .filter((x): x is { slug: string } => x !== null);
+
+  const destination = destinationForOrganizations(orgs);
+  redirect(destination.path);
 }

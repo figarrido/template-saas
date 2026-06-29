@@ -213,13 +213,23 @@ importers:
         version: 5.9.3
 
   packages/auth:
+    dependencies:
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
     devDependencies:
+      '@supabase/supabase-js':
+        specifier: ^2.45.0
+        version: 2.108.2
       '@template/config':
         specifier: workspace:*
         version: link:../config
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.21
+      postgres:
+        specifier: ^3.4.0
+        version: 3.4.9
       typescript:
         specifier: ^5.6.0
         version: 5.9.3
