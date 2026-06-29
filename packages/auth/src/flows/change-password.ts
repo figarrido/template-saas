@@ -1,5 +1,6 @@
 import { changePasswordSchema, type ChangePasswordInput } from '../schemas.js';
 import { isWeakPasswordError } from './errors.js';
+import { hasEmailIdentity } from './identity.js';
 import { AUTH_MESSAGES } from './messages.js';
 import type { ActionResult, AuthClient } from './types.js';
 
@@ -82,17 +83,4 @@ export async function changePassword(
   }
 
   return { ok: true, data: { message: AUTH_MESSAGES.passwordChanged } };
-}
-
-function hasEmailIdentity(user: {
-  identities?: Array<{ provider?: string }> | null;
-}): boolean {
-  // Supabase exposes the provider on each linked Identity. An email/password
-  // account always has at least one `provider: 'email'` entry; an OAuth-only
-  // User does not. `identities` is optional in the SDK type — treat missing
-  // as "we can't tell" and fall through to letting Supabase reject the
-  // re-auth (which lands on the generic invalid-credentials branch above).
-  const identities = user.identities ?? [];
-  if (identities.length === 0) return true;
-  return identities.some((identity) => identity.provider === 'email');
 }

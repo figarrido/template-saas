@@ -1,4 +1,5 @@
 import { changeEmailSchema, type ChangeEmailInput } from '../schemas.js';
+import { hasEmailIdentity } from './identity.js';
 import { AUTH_MESSAGES } from './messages.js';
 import type { ActionResult, AuthClient } from './types.js';
 
@@ -106,16 +107,4 @@ export async function changeEmail(
   }
 
   return { ok: true, data: { message: AUTH_MESSAGES.emailChangeRequested } };
-}
-
-function hasEmailIdentity(user: {
-  identities?: Array<{ provider?: string }> | null;
-}): boolean {
-  // Mirrors change-password.ts: an OAuth-only User has no `provider: 'email'`
-  // Identity and so cannot satisfy the re-auth gate. Missing `identities`
-  // (older SDK / unusual shape) falls through to letting Supabase reject
-  // the re-auth, which surfaces as the generic invalid-credentials branch.
-  const identities = user.identities ?? [];
-  if (identities.length === 0) return true;
-  return identities.some((identity) => identity.provider === 'email');
 }
