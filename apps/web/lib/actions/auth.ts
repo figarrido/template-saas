@@ -17,7 +17,7 @@ import {
   type ResendVerificationInput,
 } from '@template/auth';
 import { getRequestClient } from '@/lib/supabase/server';
-import { getMyOrganizations } from '@/lib/data/org';
+import { getMyOrgRefs } from '@/lib/data/org';
 
 // docs/architecture/09-api-boundary.md § Server Actions:
 // Server Actions in apps/web are thin adapters. They build the cookie-bound
@@ -49,12 +49,7 @@ export async function resendVerificationAction(
  * docs/architecture/03-auth.md § First-login routing.
  */
 export async function routeAfterLoginAction(): Promise<void> {
-  const memberships = await getMyOrganizations();
-  const orgs = memberships
-    .map((m) => (m.organizations ? { slug: m.organizations.slug } : null))
-    .filter((x): x is { slug: string } => x !== null);
-
-  const destination = destinationForOrganizations(orgs);
+  const destination = destinationForOrganizations(await getMyOrgRefs());
   redirect(destination.path);
 }
 

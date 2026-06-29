@@ -19,7 +19,7 @@ export async function exchangeOAuthCode(
   client: AuthClient,
   code: string,
 ): Promise<ExchangeOAuthCodeResult> {
-  if (typeof code !== 'string' || code.length === 0) {
+  if (!code) {
     return { ok: false, error: AUTH_MESSAGES.invalidInput, code: 'invalid-input' };
   }
 

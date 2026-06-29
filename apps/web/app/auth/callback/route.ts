@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { destinationForOrganizations, exchangeOAuthCode } from '@template/auth';
 import { getRequestClient } from '@/lib/supabase/server';
-import { getMyOrganizations } from '@/lib/data/org';
+import { getMyOrgRefs } from '@/lib/data/org';
 
 // Issue #8 — OAuth callback. The provider redirects the browser back here
 // with a PKCE `?code=...`; we exchange it for a Session via the cookie-bound
@@ -28,10 +28,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=oauth', req.url));
   }
 
-  const memberships = await getMyOrganizations();
-  const orgs = memberships
-    .map((m) => (m.organizations ? { slug: m.organizations.slug } : null))
-    .filter((x): x is { slug: string } => x !== null);
-  const destination = destinationForOrganizations(orgs);
+  const destination = destinationForOrganizations(await getMyOrgRefs());
   return NextResponse.redirect(new URL(destination.path, req.url));
 }
