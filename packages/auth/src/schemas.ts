@@ -53,8 +53,17 @@ export const updatePasswordSchema = z.object({
   password: passwordSchema,
 });
 
+// Change-password: the current password is validated as "non-empty" (any
+// length is accepted client-side so we don't leak the policy on the re-auth
+// field), the new password is held to the full policy. ADR-0003.
+export const changePasswordSchema = z.object({
+  currentPassword: signInPasswordSchema,
+  newPassword: passwordSchema,
+});
+
 export type SignInInput = z.infer<typeof signInSchema>;
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;
 export type RequestPasswordResetInput = z.infer<typeof requestPasswordResetSchema>;
 export type UpdatePasswordInput = z.infer<typeof updatePasswordSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

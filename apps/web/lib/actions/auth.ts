@@ -3,6 +3,7 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import {
+  changePassword,
   destinationForOrganizations,
   requestPasswordReset,
   resendVerification,
@@ -15,6 +16,8 @@ import {
   type RequestPasswordResetInput,
   type RequestPasswordResetResult,
   type ResendVerificationInput,
+  type ChangePasswordInput,
+  type ChangePasswordResult,
   type ResendVerificationResult,
   type SignInInput,
   type SignInOAuthResult,
@@ -79,6 +82,13 @@ export async function updatePasswordAction(
 ): Promise<UpdatePasswordResult> {
   const client = await getRequestClient();
   return updatePassword(client, input);
+}
+
+export async function changePasswordAction(
+  input: ChangePasswordInput,
+): Promise<ChangePasswordResult> {
+  const client = await getRequestClient();
+  return changePassword(client, input);
 }
 
 /**

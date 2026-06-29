@@ -1,11 +1,15 @@
-// Shared classifiers for Supabase auth errors. supabase-js sometimes
-// populates `code`, sometimes only `message`; older versions only expose
-// the string. Match defensively — the integration tests pin the contract.
+// Shared error-shape predicates for mapping Supabase Auth errors onto the
+// flow ActionResult codes. Lives here so sign-up, change-password, and the
+// next slice's reset-password flow can share one definition.
 
-export function isWeakPasswordError(error: {
-  code?: string | undefined;
-  message?: string;
-}): boolean {
+export type SupabaseAuthError = { code?: string | undefined; message?: string };
+
+/**
+ * Supabase signals a policy/HIBP rejection with `code: 'weak_password'`.
+ * Older supabase-js versions only populate the message, so we fall back to
+ * a defensive regex match on it.
+ */
+export function isWeakPasswordError(error: SupabaseAuthError): boolean {
   if (error.code === 'weak_password') return true;
   const message = error.message ?? '';
   return /password/i.test(message) && /(weak|breach|short|leaked|pwned)/i.test(message);

@@ -7,6 +7,7 @@ import { resendVerification } from '../src/flows/resend-verification.js';
 import { requestPasswordReset } from '../src/flows/request-password-reset.js';
 import { updatePassword } from '../src/flows/update-password.js';
 import { verifyEmailToken, isEmailOtpType } from '../src/flows/verify-email.js';
+import { changePassword } from '../src/flows/change-password.js';
 
 // Unit tests with a fake supabase client. The full round-trip against local
 // Supabase lives in test/integration/sign-in.integration.test.ts; here we
@@ -32,6 +33,7 @@ function fakeClient(opts: {
   ) => Promise<unknown>;
   updateUser?: (args: { password?: string }) => Promise<unknown>;
   getSession?: () => Promise<{ data: { session: unknown }; error: unknown }>;
+  getUser?: () => Promise<unknown>;
 }): AuthClient {
   return {
     auth: {
@@ -46,6 +48,7 @@ function fakeClient(opts: {
       getSession:
         opts.getSession ??
         (async () => ({ data: { session: { access_token: 't' } }, error: null })),
+      getUser: opts.getUser ?? (async () => ({ data: { user: null }, error: null })),
     },
   } as unknown as AuthClient;
 }
@@ -508,5 +511,167 @@ describe('resendVerification flow', () => {
     const result = await resendVerification(client, { email: 'not-an-email' });
     expect(result.ok).toBe(true);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('changePassword flow', () => {
+  const EMAIL = 'me@example.com';
+  const CURRENT = 'correct-horse-battery-staple';
+  const NEW_STRONG = 'kale-bicycle-merlot-rebound';
+
+  function emailIdentityUser(overrides: Record<string, unknown> = {}) {
+    return {
+      data: {
+        user: {
+          id: 'user-1',
+          email: EMAIL,
+          identities: [{ provider: 'email', id: 'identity-1' }],
+          ...overrides,
+        },
+      },
+      error: null,
+    };
+  }
+
+  it('re-authenticates with the current password and updates to the new one', async () => {
+    let reauthArgs: { email: string; password: string } | undefined;
+    let updateArgs: { password?: string } | undefined;
+    const client = fakeClient({
+      getUser: async () => emailIdentityUser(),
+      signInWithPassword: async (args) => {
+        reauthArgs = args;
+        return { data: { user: { id: 'user-1' }, session: { access_token: 't' } }, error: null };
+      },
+      updateUser: async (args) => {
+        updateArgs = args;
+        return { data: { user: { id: 'user-1' } }, error: null };
+      },
+    });
+
+    const result = await changePassword(client, {
+      currentPassword: CURRENT,
+      newPassword: NEW_STRONG,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.message).toMatch(/updated/i);
+    expect(reauthArgs).toEqual({ email: EMAIL, password: CURRENT });
+    expect(updateArgs).toEqual({ password: NEW_STRONG });
+  });
+
+  it('rejects a wrong current password with a generic error and never calls updateUser', async () => {
+    let updateCalled = false;
+    const client = fakeClient({
+      getUser: async () => emailIdentityUser(),
+      signInWithPassword: async () =>
+        ({ data: { user: null, session: null }, error: { code: 'invalid_credentials', message: 'nope' } }),
+      updateUser: async () => {
+        updateCalled = true;
+        return { data: { user: null }, error: null };
+      },
+    });
+
+    const result = await changePassword(client, {
+      currentPassword: 'wrong-password',
+      newPassword: NEW_STRONG,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid-credentials');
+    expect(result.error).toMatch(/current password/i);
+    expect(updateCalled).toBe(false);
+  });
+
+  it('rejects too-short new passwords with invalid-input before touching Supabase', async () => {
+    let reauthCalled = false;
+    const client = fakeClient({
+      getUser: async () => emailIdentityUser(),
+      signInWithPassword: async () => {
+        reauthCalled = true;
+        return { data: { user: { id: 'u' }, session: null }, error: null };
+      },
+    });
+    const result = await changePassword(client, {
+      currentPassword: CURRENT,
+      newPassword: 'short',
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid-input');
+    expect(reauthCalled).toBe(false);
+  });
+
+  it('rejects an empty current password with invalid-input before touching Supabase', async () => {
+    let reauthCalled = false;
+    const client = fakeClient({
+      getUser: async () => emailIdentityUser(),
+      signInWithPassword: async () => {
+        reauthCalled = true;
+        return { data: { user: { id: 'u' }, session: null }, error: null };
+      },
+    });
+    const result = await changePassword(client, {
+      currentPassword: '',
+      newPassword: NEW_STRONG,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid-input');
+    expect(reauthCalled).toBe(false);
+  });
+
+  it('surfaces Supabase weak_password (HIBP) from updateUser as invalid-input', async () => {
+    const client = fakeClient({
+      getUser: async () => emailIdentityUser(),
+      signInWithPassword: async () =>
+        ({ data: { user: { id: 'user-1' }, session: { access_token: 't' } }, error: null }),
+      updateUser: async () => ({
+        data: { user: null },
+        error: { code: 'weak_password', message: 'Password has been found in breach databases.' },
+      }),
+    });
+    const result = await changePassword(client, {
+      currentPassword: CURRENT,
+      newPassword: NEW_STRONG,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid-input');
+    expect(result.error).toMatch(/password/i);
+  });
+
+  it('short-circuits OAuth-only users with no-password-identity and never calls signInWithPassword', async () => {
+    let reauthCalled = false;
+    const client = fakeClient({
+      getUser: async () =>
+        emailIdentityUser({ identities: [{ provider: 'google', id: 'oauth-1' }] }),
+      signInWithPassword: async () => {
+        reauthCalled = true;
+        return { data: { user: { id: 'u' }, session: null }, error: null };
+      },
+    });
+    const result = await changePassword(client, {
+      currentPassword: CURRENT,
+      newPassword: NEW_STRONG,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('no-password-identity');
+    expect(reauthCalled).toBe(false);
+  });
+
+  it('returns unexpected when getUser fails (no Session)', async () => {
+    const client = fakeClient({
+      getUser: async () => ({ data: { user: null }, error: { message: 'not authenticated' } }),
+    });
+    const result = await changePassword(client, {
+      currentPassword: CURRENT,
+      newPassword: NEW_STRONG,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('unexpected');
   });
 });

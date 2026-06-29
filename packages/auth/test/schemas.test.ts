@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PASSWORD_POLICY } from '../src/policy.js';
 import {
+  changePasswordSchema,
   emailSchema,
   passwordSchema,
   signInSchema,
@@ -98,5 +99,30 @@ describe('updatePasswordSchema', () => {
   it('accepts a policy-compliant password (HIBP is enforced server-side)', () => {
     const ok = 'x'.repeat(PASSWORD_POLICY.minLength);
     expect(updatePasswordSchema.safeParse({ password: ok }).success).toBe(true);
+  });
+});
+
+describe('changePasswordSchema', () => {
+  const STRONG = 'x'.repeat(PASSWORD_POLICY.minLength);
+
+  it('accepts a non-empty current password and a policy-compliant new password', () => {
+    const parsed = changePasswordSchema.parse({
+      currentPassword: 'whatever',
+      newPassword: STRONG,
+    });
+    expect(parsed).toEqual({ currentPassword: 'whatever', newPassword: STRONG });
+  });
+
+  it('rejects an empty current password', () => {
+    expect(
+      changePasswordSchema.safeParse({ currentPassword: '', newPassword: STRONG }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a too-short new password (mirrors signup policy)', () => {
+    const short = 'x'.repeat(PASSWORD_POLICY.minLength - 1);
+    expect(
+      changePasswordSchema.safeParse({ currentPassword: 'whatever', newPassword: short }).success,
+    ).toBe(false);
   });
 });

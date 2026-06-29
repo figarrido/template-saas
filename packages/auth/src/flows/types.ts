@@ -15,6 +15,7 @@ export type ActionErrorCode =
   | 'invalid-credentials'
   | 'not-confirmed'
   | 'invalid-input'
+  | 'no-password-identity'
   | 'unexpected';
 
 // `AuthClient` is the subset of supabase-js the flows actually use. Typed

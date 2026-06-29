@@ -31,4 +31,14 @@ export const AUTH_MESSAGES = {
   // consumed or the User came in from elsewhere.
   recoverySessionMissing:
     'This password reset link is no longer valid. Request a new one to keep going.',
+  passwordChanged: 'Password updated.',
+  // Re-auth gate (ADR-0003) — surfaced on both the wrong-current-password
+  // branch and any other re-auth failure, so the response shape doesn't leak
+  // which branch we hit.
+  reauthFailed: 'Current password is incorrect.',
+  // Stable copy for an OAuth-only User who has no password Identity to
+  // re-authenticate against. The UI pairs it with a "set a password" link
+  // to the recovery flow (story 41).
+  noPasswordIdentity:
+    'Your account does not have a password yet. Set one via the password-reset flow to continue.',
 } as const;

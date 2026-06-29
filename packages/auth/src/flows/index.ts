@@ -2,6 +2,7 @@ export { signIn, type SignInResult } from './sign-in.js';
 export { signOut, type SignOutResult } from './sign-out.js';
 export { signUp, type SignUpResult, type SignUpOptions } from './sign-up.js';
 export { resendVerification, type ResendVerificationResult } from './resend-verification.js';
+export { changePassword, type ChangePasswordResult } from './change-password.js';
 export {
   requestPasswordReset,
   type RequestPasswordResetResult,
