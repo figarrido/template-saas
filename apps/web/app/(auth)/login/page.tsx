@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui';
 import { LoginForm } from './login-form.js';
+import { OAuthButtons } from '../oauth-buttons.js';
 
 export default function LoginPage() {
   return (
@@ -8,8 +9,9 @@ export default function LoginPage() {
         <CardHeader>
           <CardTitle>Log in</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
           <LoginForm />
+          <OAuthButtons />
         </CardContent>
       </Card>
     </main>
