@@ -20,5 +20,10 @@ Identity auto-linking on a provider-verified-email match relies on the
 Supabase default — ADR 0004; no manual link/unlink UI ships.
 
 Enabling a provider in a derived project is config only: flip
-`enabled: true` in `PROVIDERS`, populate the env vars, and enable it in
-`supabase/config.toml`. No flow rework.
+`enabled: true` in `PROVIDERS`, populate the env vars, and flip
+`enabled = true` on the matching `[auth.external.<provider>]` block in
+`supabase/config.toml` (all four — apple, azure, github, google — ship
+wired but disabled, with `client_id` and `secret` already routed through
+the env vars `PROVIDERS` declares). No flow rework, no toml block to
+hand-author. A drift test in `packages/auth` pins the alignment so
+`PROVIDERS` and `supabase/config.toml` can't silently diverge.
