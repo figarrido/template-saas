@@ -27,14 +27,14 @@ export async function GET(req: NextRequest) {
   const next = sanitizeNext(url.searchParams.get('next'));
 
   if (!isEmailOtpType(rawType)) {
-    return redirectInvalid(req);
+    return redirectInvalid(req, rawType);
   }
 
   const client = await getRequestClient();
   const result = await verifyEmailToken(client, { tokenHash, type: rawType });
 
   if (!result.ok) {
-    return redirectInvalid(req);
+    return redirectInvalid(req, rawType);
   }
 
   // Recovery (password reset) lands the User on the set-new-password page;
@@ -44,7 +44,16 @@ export async function GET(req: NextRequest) {
   return NextResponse.redirect(new URL(destination, req.url), { status: 303 });
 }
 
-function redirectInvalid(req: NextRequest): NextResponse {
+// A failed recovery link should send the User to /forgot-password rather
+// than the verification-email resend page — they were trying to reset, not
+// to confirm. Every other failure (signup, magiclink, email_change) lands
+// on /login with the resend-confirm affordance.
+function redirectInvalid(req: NextRequest, rawType: string | null): NextResponse {
+  if (rawType === 'recovery') {
+    const target = new URL('/forgot-password', req.url);
+    target.searchParams.set('reset', 'invalid');
+    return NextResponse.redirect(target, { status: 303 });
+  }
   const target = new URL('/login', req.url);
   target.searchParams.set('confirm', 'invalid');
   return NextResponse.redirect(target, { status: 303 });

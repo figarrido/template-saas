@@ -19,4 +19,16 @@ export const AUTH_MESSAGES = {
     'Choose a different password — this one is too easy to guess or has appeared in known breaches.',
   confirmLinkInvalid:
     'This confirmation link is no longer valid. Request a new one to keep going.',
+  // Forgot-password always returns this generic message so the form can't
+  // be used to enumerate accounts (ADR-0002). Same shape whether the
+  // address is registered or not.
+  recoveryRequested:
+    "If an account exists for that email, we've sent a password reset link.",
+  // Reset-password success copy. The current Session is preserved on this
+  // device; every other Session for the User is revoked.
+  passwordUpdated: 'Your password has been updated.',
+  // Reset-password landed with no recovery Session — the link was already
+  // consumed or the User came in from elsewhere.
+  recoverySessionMissing:
+    'This password reset link is no longer valid. Request a new one to keep going.',
 } as const;

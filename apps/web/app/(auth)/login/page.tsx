@@ -31,6 +31,11 @@ export default async function LoginPage({
             </div>
           ) : null}
           <LoginForm />
+          <p className="text-muted-foreground text-sm">
+            <Link className="underline" href="/forgot-password">
+              Forgot your password?
+            </Link>
+          </p>
         </CardContent>
       </Card>
     </main>
