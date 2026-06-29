@@ -1,4 +1,5 @@
 import { updatePasswordSchema, type UpdatePasswordInput } from '../schemas.js';
+import { isWeakPasswordError } from './errors.js';
 import { AUTH_MESSAGES } from './messages.js';
 import type { ActionResult, AuthClient } from './types.js';
 
@@ -77,12 +78,6 @@ export async function updatePassword(
   await client.auth.signOut({ scope: 'others' });
 
   return { ok: true, data: { message: AUTH_MESSAGES.passwordUpdated } };
-}
-
-function isWeakPasswordError(error: { code?: string | undefined; message?: string }): boolean {
-  if (error.code === 'weak_password') return true;
-  const message = error.message ?? '';
-  return /password/i.test(message) && /(weak|breach|short|leaked|pwned)/i.test(message);
 }
 
 function isSessionMissingError(error: {
