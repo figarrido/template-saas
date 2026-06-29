@@ -3,6 +3,7 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import {
+  changeEmail,
   changePassword,
   destinationForOrganizations,
   requestPasswordReset,
@@ -12,6 +13,8 @@ import {
   signOut,
   signUp,
   updatePassword,
+  type ChangeEmailInput,
+  type ChangeEmailResult,
   type OAuthProvider,
   type RequestPasswordResetInput,
   type RequestPasswordResetResult,
@@ -89,6 +92,18 @@ export async function changePasswordAction(
 ): Promise<ChangePasswordResult> {
   const client = await getRequestClient();
   return changePassword(client, input);
+}
+
+export async function changeEmailAction(
+  input: ChangeEmailInput,
+): Promise<ChangeEmailResult> {
+  const client = await getRequestClient();
+  return changeEmail(client, input, {
+    // Both confirmation messages (old + new addresses; issue #7 secure
+    // double-confirm) use the `{{ .TokenHash }}` template style and land on
+    // /auth/confirm with `type=email_change`.
+    emailRedirectTo: `${env.NEXT_PUBLIC_SITE_URL}/auth/confirm`,
+  });
 }
 
 /**

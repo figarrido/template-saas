@@ -8,6 +8,7 @@ import { requestPasswordReset } from '../src/flows/request-password-reset.js';
 import { updatePassword } from '../src/flows/update-password.js';
 import { verifyEmailToken, isEmailOtpType } from '../src/flows/verify-email.js';
 import { changePassword } from '../src/flows/change-password.js';
+import { changeEmail } from '../src/flows/change-email.js';
 
 // Unit tests with a fake supabase client. The full round-trip against local
 // Supabase lives in test/integration/sign-in.integration.test.ts; here we
@@ -31,7 +32,10 @@ function fakeClient(opts: {
     email: string,
     options?: { redirectTo?: string },
   ) => Promise<unknown>;
-  updateUser?: (args: { password?: string }) => Promise<unknown>;
+  updateUser?: (
+    args: { password?: string; email?: string },
+    options?: { emailRedirectTo?: string },
+  ) => Promise<unknown>;
   getSession?: () => Promise<{ data: { session: unknown }; error: unknown }>;
   getUser?: () => Promise<unknown>;
 }): AuthClient {
@@ -673,5 +677,221 @@ describe('changePassword flow', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.code).toBe('unexpected');
+  });
+});
+
+describe('changeEmail flow', () => {
+  const CURRENT_EMAIL = 'me@example.com';
+  const NEW_EMAIL = 'new-me@example.com';
+  const CURRENT_PASSWORD = 'correct-horse-battery-staple';
+
+  function emailIdentityUser(overrides: Record<string, unknown> = {}) {
+    return {
+      data: {
+        user: {
+          id: 'user-1',
+          email: CURRENT_EMAIL,
+          identities: [{ provider: 'email', id: 'identity-1' }],
+          ...overrides,
+        },
+      },
+      error: null,
+    };
+  }
+
+  it('re-authenticates with the current password and requests the email change', async () => {
+    let reauthArgs: { email: string; password: string } | undefined;
+    let updateArgs: { email?: string } | undefined;
+    let updateOptions: { emailRedirectTo?: string } | undefined;
+    const client = fakeClient({
+      getUser: async () => emailIdentityUser(),
+      signInWithPassword: async (args) => {
+        reauthArgs = args;
+        return { data: { user: { id: 'user-1' }, session: { access_token: 't' } }, error: null };
+      },
+      updateUser: async (args, options) => {
+        updateArgs = args;
+        updateOptions = options;
+        return { data: { user: { id: 'user-1' } }, error: null };
+      },
+    });
+
+    const result = await changeEmail(
+      client,
+      { currentPassword: CURRENT_PASSWORD, newEmail: NEW_EMAIL },
+      { emailRedirectTo: 'https://x.test/auth/confirm' },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.message).toMatch(/both inboxes/i);
+    expect(reauthArgs).toEqual({ email: CURRENT_EMAIL, password: CURRENT_PASSWORD });
+    expect(updateArgs).toEqual({ email: NEW_EMAIL });
+    expect(updateOptions).toEqual({ emailRedirectTo: 'https://x.test/auth/confirm' });
+  });
+
+  it('rejects a wrong current password with a generic error and never calls updateUser', async () => {
+    let updateCalled = false;
+    const client = fakeClient({
+      getUser: async () => emailIdentityUser(),
+      signInWithPassword: async () =>
+        ({ data: { user: null, session: null }, error: { code: 'invalid_credentials', message: 'nope' } }),
+      updateUser: async () => {
+        updateCalled = true;
+        return { data: { user: null }, error: null };
+      },
+    });
+
+    const result = await changeEmail(client, {
+      currentPassword: 'wrong-password',
+      newEmail: NEW_EMAIL,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid-credentials');
+    expect(result.error).toMatch(/current password/i);
+    expect(updateCalled).toBe(false);
+  });
+
+  it('rejects a malformed new email with invalid-input before touching Supabase', async () => {
+    let reauthCalled = false;
+    const client = fakeClient({
+      getUser: async () => emailIdentityUser(),
+      signInWithPassword: async () => {
+        reauthCalled = true;
+        return { data: { user: { id: 'u' }, session: null }, error: null };
+      },
+    });
+    const result = await changeEmail(client, {
+      currentPassword: CURRENT_PASSWORD,
+      newEmail: 'not-an-email',
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid-input');
+    expect(reauthCalled).toBe(false);
+  });
+
+  it('rejects an empty current password with invalid-input before touching Supabase', async () => {
+    let reauthCalled = false;
+    const client = fakeClient({
+      getUser: async () => emailIdentityUser(),
+      signInWithPassword: async () => {
+        reauthCalled = true;
+        return { data: { user: { id: 'u' }, session: null }, error: null };
+      },
+    });
+    const result = await changeEmail(client, {
+      currentPassword: '',
+      newEmail: NEW_EMAIL,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid-input');
+    expect(reauthCalled).toBe(false);
+  });
+
+  it('rejects the call when the new email matches the current one (no Supabase round-trip)', async () => {
+    let reauthCalled = false;
+    let updateCalled = false;
+    const client = fakeClient({
+      getUser: async () => emailIdentityUser(),
+      signInWithPassword: async () => {
+        reauthCalled = true;
+        return { data: { user: { id: 'u' }, session: null }, error: null };
+      },
+      updateUser: async () => {
+        updateCalled = true;
+        return { data: { user: null }, error: null };
+      },
+    });
+    const result = await changeEmail(client, {
+      currentPassword: CURRENT_PASSWORD,
+      // Schema lowercases & trims, so a mixed-case input must still match.
+      newEmail: '  Me@Example.COM ',
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid-input');
+    expect(result.error).toMatch(/same/i);
+    expect(reauthCalled).toBe(false);
+    expect(updateCalled).toBe(false);
+  });
+
+  it('short-circuits OAuth-only users with no-password-identity and never calls signInWithPassword', async () => {
+    let reauthCalled = false;
+    const client = fakeClient({
+      getUser: async () =>
+        emailIdentityUser({ identities: [{ provider: 'google', id: 'oauth-1' }] }),
+      signInWithPassword: async () => {
+        reauthCalled = true;
+        return { data: { user: { id: 'u' }, session: null }, error: null };
+      },
+    });
+    const result = await changeEmail(client, {
+      currentPassword: CURRENT_PASSWORD,
+      newEmail: NEW_EMAIL,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('no-password-identity');
+    expect(reauthCalled).toBe(false);
+  });
+
+  it('returns unexpected when getUser fails (no Session)', async () => {
+    const client = fakeClient({
+      getUser: async () => ({ data: { user: null }, error: { message: 'not authenticated' } }),
+    });
+    const result = await changeEmail(client, {
+      currentPassword: CURRENT_PASSWORD,
+      newEmail: NEW_EMAIL,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('unexpected');
+  });
+
+  it('maps an unexpected updateUser error (e.g. email already taken) to the unexpected branch — no enumeration leak', async () => {
+    const client = fakeClient({
+      getUser: async () => emailIdentityUser(),
+      signInWithPassword: async () =>
+        ({ data: { user: { id: 'user-1' }, session: { access_token: 't' } }, error: null }),
+      updateUser: async () => ({
+        data: { user: null },
+        error: { code: 'email_exists', message: 'A user with this email already exists.' },
+      }),
+    });
+    const result = await changeEmail(client, {
+      currentPassword: CURRENT_PASSWORD,
+      newEmail: NEW_EMAIL,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('unexpected');
+    // The Supabase message is NOT echoed verbatim — that would let a signed-in
+    // attacker enumerate other Users' email addresses.
+    expect(result.error).not.toMatch(/already exists/i);
+  });
+
+  it('omits the options arg to updateUser when no emailRedirectTo is supplied', async () => {
+    let updateOptions: { emailRedirectTo?: string } | undefined | symbol = Symbol('not-called');
+    const client = fakeClient({
+      getUser: async () => emailIdentityUser(),
+      signInWithPassword: async () =>
+        ({ data: { user: { id: 'user-1' }, session: { access_token: 't' } }, error: null }),
+      updateUser: async (_args, options) => {
+        updateOptions = options;
+        return { data: { user: { id: 'user-1' } }, error: null };
+      },
+    });
+
+    const result = await changeEmail(client, {
+      currentPassword: CURRENT_PASSWORD,
+      newEmail: NEW_EMAIL,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(updateOptions).toBeUndefined();
   });
 });

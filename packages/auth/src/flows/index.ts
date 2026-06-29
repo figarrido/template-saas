@@ -4,6 +4,11 @@ export { signUp, type SignUpResult, type SignUpOptions } from './sign-up.js';
 export { resendVerification, type ResendVerificationResult } from './resend-verification.js';
 export { changePassword, type ChangePasswordResult } from './change-password.js';
 export {
+  changeEmail,
+  type ChangeEmailResult,
+  type ChangeEmailOptions,
+} from './change-email.js';
+export {
   requestPasswordReset,
   type RequestPasswordResetResult,
   type RequestPasswordResetOptions,

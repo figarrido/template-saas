@@ -41,4 +41,14 @@ export const AUTH_MESSAGES = {
   // to the recovery flow (story 41).
   noPasswordIdentity:
     'Your account does not have a password yet. Set one via the password-reset flow to continue.',
+  // Change-email success copy. With `double_confirm_changes = true` Supabase
+  // sends a confirmation link to BOTH the old and new addresses; the change
+  // is only applied once both are clicked. Until then the User can still
+  // sign in with the old email.
+  emailChangeRequested:
+    "Check both inboxes. We've sent a confirmation link to your current and new email addresses — open both to complete the change.",
+  // The User typed their existing address as the "new" one. Bail before
+  // hitting Supabase so the form gives an actionable error instead of a
+  // silent no-op.
+  emailUnchanged: 'New email is the same as your current email.',
 } as const;

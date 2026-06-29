@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PASSWORD_POLICY } from '../src/policy.js';
 import {
+  changeEmailSchema,
   changePasswordSchema,
   emailSchema,
   passwordSchema,
@@ -123,6 +124,29 @@ describe('changePasswordSchema', () => {
     const short = 'x'.repeat(PASSWORD_POLICY.minLength - 1);
     expect(
       changePasswordSchema.safeParse({ currentPassword: 'whatever', newPassword: short }).success,
+    ).toBe(false);
+  });
+});
+
+describe('changeEmailSchema', () => {
+  it('accepts a non-empty current password and a valid new email; normalises the address', () => {
+    const parsed = changeEmailSchema.parse({
+      currentPassword: 'whatever',
+      newEmail: '  New@Example.COM ',
+    });
+    expect(parsed).toEqual({ currentPassword: 'whatever', newEmail: 'new@example.com' });
+  });
+
+  it('rejects an empty current password', () => {
+    expect(
+      changeEmailSchema.safeParse({ currentPassword: '', newEmail: 'a@b.co' }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a malformed new email', () => {
+    expect(
+      changeEmailSchema.safeParse({ currentPassword: 'whatever', newEmail: 'not-an-email' })
+        .success,
     ).toBe(false);
   });
 });

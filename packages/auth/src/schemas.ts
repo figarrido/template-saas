@@ -61,9 +61,18 @@ export const changePasswordSchema = z.object({
   newPassword: passwordSchema,
 });
 
+// Change-email: the current password gates the re-auth (ADR-0003); the new
+// email is validated and normalised exactly like sign-in / sign-up so it
+// round-trips through Supabase the same way.
+export const changeEmailSchema = z.object({
+  currentPassword: signInPasswordSchema,
+  newEmail: emailSchema,
+});
+
 export type SignInInput = z.infer<typeof signInSchema>;
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;
 export type RequestPasswordResetInput = z.infer<typeof requestPasswordResetSchema>;
 export type UpdatePasswordInput = z.infer<typeof updatePasswordSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type ChangeEmailInput = z.infer<typeof changeEmailSchema>;
