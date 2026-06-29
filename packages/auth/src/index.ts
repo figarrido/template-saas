@@ -2,8 +2,10 @@ export { can, assertCan, ForbiddenError, type Action, type Role, type Membership
 export {
   PROVIDERS,
   enabledProviders,
+  oauthSignInButtons,
   type OAuthProvider,
   type OAuthProviderConfig,
+  type OAuthButton,
 } from './providers.js';
 export {
   ACTIVE_ORG_COOKIE,
@@ -31,6 +33,8 @@ export {
   signOut,
   signUp,
   resendVerification,
+  signInOAuth,
+  exchangeOAuthCode,
   destinationForOrganizations,
   verifyEmailToken,
   isEmailOtpType,
@@ -43,6 +47,9 @@ export {
   type ResendVerificationResult,
   type VerifyEmailResult,
   type EmailOtpType,
+  type SignInOAuthInput,
+  type SignInOAuthResult,
+  type ExchangeOAuthCodeResult,
   type Destination,
   type OrgRef,
   type ActionResult,

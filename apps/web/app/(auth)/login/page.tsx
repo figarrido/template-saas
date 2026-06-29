@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui';
 import { AUTH_MESSAGES } from '@template/auth';
 import { LoginForm } from './login-form.js';
+import { OAuthButtons } from '../oauth-buttons.js';
 
 type SearchParams = { confirm?: string | string[] };
 
@@ -31,6 +32,7 @@ export default async function LoginPage({
             </div>
           ) : null}
           <LoginForm />
+          <OAuthButtons />
         </CardContent>
       </Card>
     </main>

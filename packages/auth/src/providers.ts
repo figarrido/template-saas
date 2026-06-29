@@ -43,3 +43,30 @@ export const PROVIDERS: ReadonlyArray<OAuthProviderConfig> = [
 export function enabledProviders(): OAuthProviderConfig[] {
   return PROVIDERS.filter((p) => p.enabled);
 }
+
+const PROVIDER_LABELS: Record<OAuthProvider, string> = {
+  google: 'Continue with Google',
+  github: 'Continue with GitHub',
+  apple: 'Continue with Apple',
+  azure: 'Continue with Microsoft',
+};
+
+export type OAuthButton = {
+  provider: OAuthProvider;
+  label: string;
+};
+
+/**
+ * Shape the enabled providers into the props an OAuth-button list needs.
+ * Pure so the UI on the sign-in/sign-up pages can stay declarative —
+ * `oauthSignInButtons().map(b => <Button .../>)` — and so a test can drive
+ * it with a custom config to assert "when a provider is flipped on, a
+ * button for it is what the UI would render."
+ */
+export function oauthSignInButtons(
+  providers: ReadonlyArray<OAuthProviderConfig> = PROVIDERS,
+): OAuthButton[] {
+  return providers
+    .filter((p) => p.enabled)
+    .map((p) => ({ provider: p.provider, label: PROVIDER_LABELS[p.provider] }));
+}

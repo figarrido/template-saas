@@ -1,4 +1,5 @@
 import { cache } from 'react';
+import type { OrgRef } from '@template/auth';
 import { getRequestClient } from '@/lib/supabase/server';
 
 export type OrgMembership = {
@@ -17,3 +18,10 @@ export const getMyOrganizations = cache(async (): Promise<OrgMembership[]> => {
   if (error) throw error;
   return (data ?? []) as unknown as OrgMembership[];
 });
+
+// Slug-only view of the current User's Organizations — the shape
+// `destinationForOrganizations` consumes for first-login routing.
+export async function getMyOrgRefs(): Promise<OrgRef[]> {
+  const memberships = await getMyOrganizations();
+  return memberships.flatMap((m) => (m.organizations ? [{ slug: m.organizations.slug }] : []));
+}
