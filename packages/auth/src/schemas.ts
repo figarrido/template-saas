@@ -27,9 +27,18 @@ export const signInSchema = z.object({
   password: signInPasswordSchema,
 });
 
+// Sign-up enforces the password policy length client-side so the user gets
+// the rule before they submit. Leaked-password (HIBP) is still enforced
+// server-side by Supabase and surfaced as a flow error.
+export const signUpSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
+});
+
 export const resendVerificationSchema = z.object({
   email: emailSchema,
 });
 
 export type SignInInput = z.infer<typeof signInSchema>;
+export type SignUpInput = z.infer<typeof signUpSchema>;
 export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;

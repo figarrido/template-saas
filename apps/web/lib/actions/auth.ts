@@ -6,12 +6,16 @@ import {
   resendVerification,
   signIn,
   signOut,
+  signUp,
   type ResendVerificationResult,
   type SignInResult,
   type SignOutResult,
+  type SignUpResult,
   type SignInInput,
+  type SignUpInput,
   type ResendVerificationInput,
 } from '@template/auth';
+import { env } from '@template/env/web';
 import { getRequestClient } from '@/lib/supabase/server';
 import { getMyOrganizations } from '@/lib/data/org';
 
@@ -28,6 +32,16 @@ export async function loginAction(input: SignInInput): Promise<SignInResult> {
 export async function logoutAction(): Promise<SignOutResult> {
   const client = await getRequestClient();
   return signOut(client);
+}
+
+export async function signUpAction(input: SignUpInput): Promise<SignUpResult> {
+  const client = await getRequestClient();
+  return signUp(client, input, {
+    // Verification links use the `{{ .TokenHash }}` template style and land
+    // on our `/auth/confirm` Route Handler — see parent PRD § Execution
+    // model. Supabase appends `?token_hash=…&type=signup` to this URL.
+    emailRedirectTo: `${env.NEXT_PUBLIC_SITE_URL}/auth/confirm`,
+  });
 }
 
 export async function resendVerificationAction(

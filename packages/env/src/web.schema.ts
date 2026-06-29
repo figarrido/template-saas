@@ -10,6 +10,11 @@ export const webServer = {
   MAIL_PROVIDER: z.enum(['resend', 'smtp']).default('smtp'),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().optional(),
+  // Supabase Auth → React Email send-email hook (ADR-0005). The secret is
+  // the Standard Webhooks key registered in supabase/config.toml; AUTH_EMAIL_FROM
+  // is the From: address every auth email ships with.
+  SEND_EMAIL_HOOK_SECRET: z.string().min(1).optional(),
+  AUTH_EMAIL_FROM: z.string().min(1).default('Auth <auth@template.test>'),
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
   POSTHOG_PROJECT_API_KEY: z.string().optional(),
@@ -34,6 +39,8 @@ export const webSchema: SurfaceSchema = {
     MAIL_PROVIDER: 'smtp',
     SMTP_HOST: '127.0.0.1',
     SMTP_PORT: '54425',
+    SEND_EMAIL_HOOK_SECRET: 'v1,whsec_replace_me',
+    AUTH_EMAIL_FROM: 'Auth <auth@template.test>',
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_replace_me',
     NEXT_PUBLIC_POSTHOG_KEY: 'phc_replace_me',
     NEXT_PUBLIC_POSTHOG_HOST: 'https://us.i.posthog.com',
@@ -47,6 +54,8 @@ export const webSchema: SurfaceSchema = {
     MAIL_PROVIDER: '`smtp` in dev (InBucket), `resend` in prod.',
     SMTP_HOST: 'InBucket host. Written by `pnpm setup` from `supabase status`.',
     SMTP_PORT: 'InBucket port. Written by `pnpm setup` from `supabase status`.',
+    SEND_EMAIL_HOOK_SECRET: 'Standard Webhooks key for the Supabase send-email Auth hook (ADR-0005). Must match supabase/config.toml.',
+    AUTH_EMAIL_FROM: 'From: address for verification / recovery / email-change emails.',
     UPSTASH_REDIS_REST_URL: 'Upstash Redis REST URL. Absent = rate-limit no-ops.',
     UPSTASH_REDIS_REST_TOKEN: 'Upstash Redis REST token.',
     POSTHOG_PROJECT_API_KEY: 'PostHog server-side project key (for OpenFeature provider).',

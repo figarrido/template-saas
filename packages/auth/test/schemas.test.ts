@@ -5,6 +5,7 @@ import {
   passwordSchema,
   signInSchema,
   signInPasswordSchema,
+  signUpSchema,
 } from '../src/schemas.js';
 
 describe('emailSchema', () => {
@@ -45,5 +46,32 @@ describe('signInSchema', () => {
   it('parses email + password together', () => {
     const parsed = signInSchema.parse({ email: 'a@b.co', password: 'p' });
     expect(parsed).toEqual({ email: 'a@b.co', password: 'p' });
+  });
+});
+
+describe('signUpSchema', () => {
+  it('accepts a valid email + policy-compliant password', () => {
+    const parsed = signUpSchema.parse({
+      email: 'A@B.co',
+      password: 'x'.repeat(PASSWORD_POLICY.minLength),
+    });
+    expect(parsed).toEqual({
+      email: 'a@b.co',
+      password: 'x'.repeat(PASSWORD_POLICY.minLength),
+    });
+  });
+
+  it('rejects too-short passwords with the same policy as passwordSchema', () => {
+    const short = 'x'.repeat(PASSWORD_POLICY.minLength - 1);
+    expect(signUpSchema.safeParse({ email: 'a@b.co', password: short }).success).toBe(false);
+  });
+
+  it('rejects malformed emails', () => {
+    expect(
+      signUpSchema.safeParse({
+        email: 'not-an-email',
+        password: 'x'.repeat(PASSWORD_POLICY.minLength),
+      }).success,
+    ).toBe(false);
   });
 });

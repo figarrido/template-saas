@@ -8,7 +8,8 @@
     "./provider": "./src/provider.ts",
     "./providers/resend": "./src/providers/resend.ts",
     "./providers/smtp": "./src/providers/smtp.ts",
-    "./templates": "./src/templates/index.ts"
+    "./templates": "./src/templates/index.ts",
+    "./hooks/send-email": "./src/hooks/send-email.ts"
   },
   "scripts": {
     "test": "vitest run",

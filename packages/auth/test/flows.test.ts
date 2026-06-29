@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { AuthClient } from '../src/flows/types.js';
 import { signIn } from '../src/flows/sign-in.js';
 import { signOut } from '../src/flows/sign-out.js';
+import { signUp } from '../src/flows/sign-up.js';
 import { resendVerification } from '../src/flows/resend-verification.js';
+import { verifyEmailToken, isEmailOtpType } from '../src/flows/verify-email.js';
 
 // Unit tests with a fake supabase client. The full round-trip against local
 // Supabase lives in test/integration/sign-in.integration.test.ts; here we
@@ -16,6 +18,12 @@ function fakeClient(opts: {
   signInWithPassword?: (args: { email: string; password: string }) => Promise<unknown>;
   signOut?: (args?: { scope?: 'local' | 'global' | 'others' }) => Promise<{ error: unknown }>;
   resend?: (args: { type: string; email: string }) => Promise<unknown>;
+  signUp?: (args: {
+    email: string;
+    password: string;
+    options?: { emailRedirectTo?: string };
+  }) => Promise<unknown>;
+  verifyOtp?: (args: { type: string; token_hash: string }) => Promise<unknown>;
 }): AuthClient {
   return {
     auth: {
@@ -23,6 +31,8 @@ function fakeClient(opts: {
         opts.signInWithPassword ?? (async () => ({ data: { user: null, session: null }, error: null })),
       signOut: opts.signOut ?? (async () => ({ error: null })),
       resend: opts.resend ?? (async () => ({})),
+      signUp: opts.signUp ?? (async () => ({ data: { user: null, session: null }, error: null })),
+      verifyOtp: opts.verifyOtp ?? (async () => ({ data: { user: null, session: null }, error: null })),
     },
   } as unknown as AuthClient;
 }
@@ -113,6 +123,178 @@ describe('signOut flow', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.code).toBe('unexpected');
+  });
+});
+
+describe('signUp flow', () => {
+  const PASSWORD = 'correct-horse-battery-staple';
+  const EMAIL = 'new@example.com';
+
+  it('returns the generic "check your email" success on a fresh signup', async () => {
+    const client = fakeClient({
+      signUp: async () =>
+        ({
+          data: {
+            user: {
+              id: 'user-1',
+              email: EMAIL,
+              identities: [{ id: 'identity-1', identity_id: 'identity-1' }],
+            },
+            session: null,
+          },
+          error: null,
+        }),
+    });
+    const result = await signUp(client, { email: EMAIL, password: PASSWORD });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.message).toMatch(/check your email/i);
+  });
+
+  it('returns the SAME generic response when the email is already registered (no enumeration leak)', async () => {
+    // Supabase signals "already registered" by returning a user with no
+    // identities and session: null. ADR-0002: the flow must NOT surface
+    // this — same shape as the success case.
+    const client = fakeClient({
+      signUp: async () =>
+        ({
+          data: {
+            user: { id: 'obfuscated', email: EMAIL, identities: [] },
+            session: null,
+          },
+          error: null,
+        }),
+    });
+    const fresh = await signUp(client, { email: EMAIL, password: PASSWORD });
+    const duplicate = await signUp(client, { email: EMAIL, password: PASSWORD });
+    expect(duplicate).toEqual(fresh);
+    if (!duplicate.ok) return;
+    expect(duplicate.data.message).toMatch(/check your email/i);
+  });
+
+  it('forwards an emailRedirectTo option to supabase-js', async () => {
+    let received: { emailRedirectTo?: string } | undefined;
+    const client = fakeClient({
+      signUp: async (args) => {
+        received = args.options;
+        return {
+          data: { user: { id: 'u', email: EMAIL, identities: [{ id: 'i' }] }, session: null },
+          error: null,
+        };
+      },
+    });
+    await signUp(client, { email: EMAIL, password: PASSWORD }, { emailRedirectTo: 'https://x.test/cb' });
+    expect(received).toEqual({ emailRedirectTo: 'https://x.test/cb' });
+  });
+
+  it('rejects too-short passwords client-side with invalid-input', async () => {
+    const result = await signUp(fakeClient({}), { email: EMAIL, password: 'short' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid-input');
+  });
+
+  it('rejects malformed emails client-side with invalid-input', async () => {
+    const result = await signUp(fakeClient({}), { email: 'not-an-email', password: PASSWORD });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid-input');
+  });
+
+  it('surfaces Supabase weak_password (HIBP) as a clear invalid-input error', async () => {
+    const client = fakeClient({
+      signUp: async () =>
+        ({
+          data: { user: null, session: null },
+          error: {
+            code: 'weak_password',
+            message: 'Password has been found in breach databases.',
+          },
+        }),
+    });
+    const result = await signUp(client, { email: EMAIL, password: PASSWORD });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid-input');
+    expect(result.error).toMatch(/password/i);
+  });
+
+  it('does NOT return a Session even on success (verification gate)', async () => {
+    const client = fakeClient({
+      signUp: async () =>
+        ({
+          data: {
+            user: { id: 'u', email: EMAIL, identities: [{ id: 'i' }] },
+            session: { access_token: 'should-be-ignored' },
+          },
+          error: null,
+        }),
+    });
+    const result = await signUp(client, { email: EMAIL, password: PASSWORD });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Result shape carries only the generic message — no session, no user id.
+    expect(Object.keys(result.data)).toEqual(['message']);
+  });
+
+  it('maps an unexpected error code to the unexpected branch', async () => {
+    const client = fakeClient({
+      signUp: async () =>
+        ({
+          data: { user: null, session: null },
+          error: { code: 'over_request_rate_limit', message: 'too many' },
+        }),
+    });
+    const result = await signUp(client, { email: EMAIL, password: PASSWORD });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('unexpected');
+  });
+});
+
+describe('verifyEmailToken flow', () => {
+  it('returns ok with the userId when verifyOtp succeeds', async () => {
+    let received: { type: string; token_hash: string } | undefined;
+    const client = fakeClient({
+      verifyOtp: async (args) => {
+        received = args;
+        return { data: { user: { id: 'user-1' }, session: { access_token: 't' } }, error: null };
+      },
+    });
+    const result = await verifyEmailToken(client, { tokenHash: 'hash-1', type: 'signup' });
+    expect(result).toEqual({ ok: true, data: { userId: 'user-1' } });
+    expect(received).toEqual({ type: 'signup', token_hash: 'hash-1' });
+  });
+
+  it('returns the generic "no longer valid" error when verifyOtp fails', async () => {
+    const client = fakeClient({
+      verifyOtp: async () => ({ data: { user: null, session: null }, error: { message: 'expired' } }),
+    });
+    const result = await verifyEmailToken(client, { tokenHash: 'hash-1', type: 'signup' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toMatch(/no longer valid/i);
+  });
+
+  it('rejects an empty token_hash without hitting Supabase', async () => {
+    let calls = 0;
+    const client = fakeClient({
+      verifyOtp: async () => {
+        calls++;
+        return { data: { user: { id: 'u' }, session: null }, error: null };
+      },
+    });
+    const result = await verifyEmailToken(client, { tokenHash: '', type: 'signup' });
+    expect(result.ok).toBe(false);
+    expect(calls).toBe(0);
+  });
+
+  it('isEmailOtpType accepts known types and rejects everything else', () => {
+    expect(isEmailOtpType('signup')).toBe(true);
+    expect(isEmailOtpType('recovery')).toBe(true);
+    expect(isEmailOtpType('email_change')).toBe(true);
+    expect(isEmailOtpType('not-a-real-type')).toBe(false);
+    expect(isEmailOtpType(undefined)).toBe(false);
   });
 });
 
