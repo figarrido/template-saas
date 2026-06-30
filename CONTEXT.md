@@ -7,8 +7,12 @@ A multi-tenant SaaS template built on Next.js, Supabase, and Stripe. Provides th
 ### Identity
 
 **User**:
-A person who has authenticated with the system. Encompasses both the authentication identity (`auth.users`) and the display identity (`profiles`) — the two are always created together and are never spoken of separately.
+A person who has authenticated with the system. Encompasses both the account record (`auth.users`) and the display record (`profiles`) — the two are always created together and are never spoken of separately. *How* the person proves they are this User is an Identity (see below).
 _Avoid_: Profile, Account, Principal
+
+**Identity**:
+A single authentication method bound to a User — email/password, or an OAuth provider (Google, GitHub, etc.). One User can hold several Identities (Supabase `auth.identities`); Identities that share a provider-verified email are auto-linked onto the same User. The distinction from User is the point: the User is the person, an Identity is one way they prove it.
+_Avoid_: Credential, Login, Account; do not conflate with Provider (an Identity is served *by* an OAuth provider, it is not one)
 
 **Member**:
 A User's association with an Organization, carrying an org-scoped role (`owner`, `manager`, or `member`). A User with no Memberships exists (e.g., just signed up, no org yet) but cannot access any org's data.
@@ -20,6 +24,14 @@ _Avoid_: Admin User, Staff, Super Admin
 
 **Invitation**:
 A pending offer for a person (possibly not yet a User) to become a Member of an Organization. Has a signed token, expiry, and target role. Progresses to a Membership on acceptance.
+
+**Session**:
+A User's authenticated state on one device, backed by a short-lived Supabase access token plus a rotating refresh token, stored in cookies. Sign-out is per-device by default; a password reset revokes the User's Sessions on all *other* devices.
+_Avoid_: Login (as a noun for this state), Token
+
+**Re-authentication**:
+Re-proving identity by re-entering the current password immediately before a sensitive change (changing password or email). Distinct from sign-in: the User already holds a Session — re-authentication guards the specific action, not access to the app.
+_Avoid_: Confirm-password, Step-up (reserve "step-up" for MFA)
 
 ### Organization & roles
 
@@ -61,4 +73,4 @@ _Avoid_: Feature flag, permission (when referring to billing-derived access)
 ### Adapters
 
 **Provider**:
-An adapter role behind a swappable interface. Never use the word bare — always qualify it, because three unrelated provider roles exist: **billing provider** (`BillingProvider` — charges money, e.g. Stripe), **emitter provider** (`EmitterProvider` — emits legal Invoices, e.g. Openfactura), and **flag provider** (the OpenFeature provider — serves feature flags, e.g. PostHog). "Configure the provider" with no qualifier is always ambiguous.
+An adapter role behind a swappable interface. Never use the word bare — always qualify it, because four unrelated provider roles exist: **billing provider** (`BillingProvider` — charges money, e.g. Stripe), **emitter provider** (`EmitterProvider` — emits legal Invoices, e.g. Openfactura), **flag provider** (the OpenFeature provider — serves feature flags, e.g. PostHog), and **OAuth provider** (a.k.a. identity provider — serves sign-in via Supabase Auth, e.g. Google/GitHub; the thing behind an Identity). "Configure the provider" with no qualifier is always ambiguous.

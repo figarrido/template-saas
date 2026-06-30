@@ -48,6 +48,60 @@
 
 ---
 
+## End-user authentication flows (`apps/web`)
+
+**Decision:** Ship the full end-user credential surface in `apps/web`: **sign-up, sign-in, sign-out, forgot-password, reset-password, change-password, change-email, email-verification + resend**, plus the first-login routing redirect. All of `apps/admin` auth (Operator sign-in + the mandatory-MFA enrollment/challenge/recovery-codes stack) is a **separate follow-up build** — admin sign-in is inseparable from the MFA gate, so they ship together, not here. Also deferred: end-user MFA, self-serve account deletion (a [recipe](../recipes/) — touches the GDPR non-goal), an active-sessions list, CAPTCHA on sign-up (a hardening recipe), and invite-aware sign-up (invitation acceptance is its own flow — see below).
+
+### Execution model
+
+- **Server Actions** for every credential submit (sign-up, sign-in, request-reset, set-new-password, change-password, change-email), grouped in `apps/web/lib/actions/auth.ts`. Matches [09-api-boundary](./09-api-boundary.md).
+- **Two Route Handlers** for the redirect *landings*, which are GET navigations and so cannot be Server Actions:
+  - `/auth/confirm` — verifies the one-time `token_hash` from verification / recovery / email-change emails via `verifyOtp`.
+  - `/auth/callback` — exchanges the OAuth PKCE `code` via `exchangeCodeForSession`. Ships now, dormant until a provider is enabled.
+- Email links therefore use the **`{{ .TokenHash }}`** template style pointing at `/auth/confirm`, not the legacy hosted `/auth/v1/verify` URL.
+- The SSR session is cookie-backed via `@supabase/ssr`; the cookie-adapter glue extends `packages/db`'s `getUserClient`. Shared Zod schemas + the password-policy constants live in `packages/auth` (single source the future admin build reuses).
+
+### Verification & enumeration
+
+- **Email verification is required before first sign-in** (`[auth.email] enable_confirmations` ON). Sign-up lands on a "check your email" interstitial; an unconfirmed sign-in is blocked with an inline resend affordance. Verified-email is then an invariant the rest of the app may assume.
+- **Account-enumeration posture is privacy-preserving with one deliberate exception** — see [ADR 0002](../adr/0002-account-enumeration-posture.md). Sign-up and forgot-password are always generic; sign-in reveals "email not confirmed" only after a *correct* password.
+
+### Password policy
+
+- **Length-first, NIST-aligned:** minimum length **10**, no composition rules, Supabase **leaked-password protection (HaveIBeenPwned)** ON. The shared Zod schema mirrors the length so client and Server Action agree; HIBP is enforced server-side by Supabase and surfaced as a flow error. Length is a one-line knob derived projects can raise.
+
+### Sessions
+
+- **Persistent sessions, no remember-me toggle.** `@supabase/ssr` cookies with auto-refresh (short access token + rotating refresh token).
+- **Sign-out uses `scope: 'local'`** (this device only), so signing out on one device doesn't kill the User's others.
+- **Password reset revokes all *other* sessions** ("revoke other sessions on password change"), since reset is the account-recovery path.
+
+### Sensitive changes (re-auth)
+
+- **Change-password and change-email both require the current password**, verified by a silent `signInWithPassword` before `updateUser` — see [ADR 0003](../adr/0003-reauth-for-sensitive-account-changes.md). Email change uses Supabase's secure double-confirm; the new address is inactive until confirmed via `/auth/confirm?type=email_change`.
+
+### OAuth seam ("open to social later")
+
+- The `PROVIDERS` array + `enabledProviders()` in `packages/auth` **is** the seam. Sign-in/sign-up pages render one button per enabled provider (today: none → pure email/password). Initiation is a small Server Action calling `signInWithOAuth({ provider, options.redirectTo: '/auth/callback' })`.
+- Adding a provider later = flip `enabled: true` + add env vars + register credentials in Supabase. **No flow rework.**
+- **Identity linking is automatic on verified-email match** — see [ADR 0004](../adr/0004-auto-link-identities-on-verified-email.md). The manual link/unlink settings UI is deferred.
+
+### Auth email delivery
+
+- Verification / recovery / email-change emails are sent via a Supabase **send-email Auth hook → React Email** (`packages/email`), Resend (prod) / InBucket (dev) — see [ADR 0005](../adr/0005-auth-emails-via-send-email-hook.md).
+
+**Why:**
+- The credential flows are the most-reskinned but least-rearchitected part of every derived project; shipping the bones (execution model, policies, OAuth seam) saves the re-architecture while leaving styling free.
+- The OAuth seam is wired-but-dormant so "add Google sign-in" is config, not a refactor — consistent with the email/password-only default above.
+
+**Tradeoffs:**
+- The wired flows + the send-email hook are weight every derived project carries even when they restyle. Accepted for the re-architecture they save.
+- The enumeration exception, the re-auth gate, the auto-link policy, and the email hook each deviate from a Supabase default; the ADRs record why so they aren't "fixed" back.
+
+**Related:** [02-data](./02-data.md), [07-frontend](./07-frontend.md), [09-api-boundary](./09-api-boundary.md), [ADR 0002](../adr/0002-account-enumeration-posture.md), [ADR 0003](../adr/0003-reauth-for-sensitive-account-changes.md), [ADR 0004](../adr/0004-auto-link-identities-on-verified-email.md), [ADR 0005](../adr/0005-auth-emails-via-send-email-hook.md)
+
+---
+
 ## Onboarding & invitation flows
 
 **Decision:** Ship wired flows. `profiles` table 1:1 with `auth.users`. Multi-org with login-time picker. Signed-token email invites. Role enum (`owner` / `manager` / `member`) with a central `can(membership, action)` helper.
