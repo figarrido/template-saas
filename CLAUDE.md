@@ -231,3 +231,21 @@ middleware.ts  auth, active-org, CSP nonce, rate-limit
 | `docs/architecture/12-local-dev.md` | Local dev workflow |
 | `docs/constraints/budget.md` | Free-tier posture; revisit thresholds |
 | `docs/constraints/team.md` | 1-3 contributor assumptions; scaling thresholds |
+
+---
+
+## Agent skills
+
+Per-repo configuration the engineering skills (`to-issues`, `triage`, `to-prd`, `qa`, `improve-codebase-architecture`, `diagnosing-bugs`, `tdd`) read.
+
+### Issue tracker
+
+GitHub Issues on `figarrido/template-saas` (via `gh`); external PRs are also a triage surface. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical defaults — `needs-triage` / `needs-info` / `ready-for-agent` / `ready-for-human` / `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Multi-context (`CONTEXT-MAP.md` at root; one resolved shared context today, per-surface contexts added lazily). See `docs/agents/domain.md`.
