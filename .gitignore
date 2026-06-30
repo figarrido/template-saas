@@ -58,3 +58,6 @@ supabase/.env
 
 # Changesets
 .changeset/*-changelog.md
+
+# PNPM Store
+.pnpm-store/
