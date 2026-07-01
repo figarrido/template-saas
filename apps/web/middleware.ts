@@ -57,9 +57,20 @@ export async function middleware(req: NextRequest) {
 }
 
 function buildCsp(nonce: string): string {
+  // Next.js dev serves the client runtime via webpack `eval()` and Fast Refresh,
+  // both of which need `'unsafe-eval'`. Without it the strict CSP blocks the
+  // client bundle from executing, the page never hydrates, and forms fall back
+  // to a native (non-JS) submit — e.g. login silently GETs instead of running
+  // the Server Action. Emit it in dev only; production runs without eval and
+  // must keep the strict policy.
+  const scriptSrc =
+    process.env.NODE_ENV === 'production'
+      ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`
+      : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval'`;
+
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    scriptSrc,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
