@@ -60,7 +60,7 @@ export function ChangePasswordForm() {
   }
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+    <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
       <Field>
         <FieldLabel htmlFor="currentPassword">Current password</FieldLabel>
         <Input

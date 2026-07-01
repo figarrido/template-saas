@@ -41,7 +41,7 @@ export function SignUpForm() {
   }
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+    <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
       <Field>
         <FieldLabel htmlFor="email">Email</FieldLabel>
         <Input id="email" type="email" autoComplete="email" {...form.register('email')} />
