@@ -1,7 +1,7 @@
 {
   "script": "dev:start",
   "apps": {
-    "apps/web": { "name": "template" },
+    "apps/web": { "name": "template", "appPort": 3000 },
     "apps/admin": { "name": "admin.template" },
     "services/worker-node": { "proxy": false },
     "services/worker-py": { "proxy": false }

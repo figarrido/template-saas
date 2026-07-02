@@ -1,5 +1,6 @@
 #!/usr/bin/env -S tsx
 import { execFileSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -47,7 +48,53 @@ const targets: Target[] = [
   { schema: workerPySchema, envPath: 'services/worker-py/.env.local' },
 ];
 
-function writeEnvLocal(target: Target, supabase: Map<string, string>): void {
+function readEnvVar(path: string, name: string): string | undefined {
+  if (!existsSync(path)) return undefined;
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+    if (m && m[1] === name) return m[2];
+  }
+  return undefined;
+}
+
+function upsertEnvVar(path: string, name: string, value: string, header: string): void {
+  let lines: string[];
+  if (existsSync(path)) {
+    lines = readFileSync(path, 'utf8').replace(/\n+$/, '').split('\n');
+    const idx = lines.findIndex((l) => l.startsWith(`${name}=`));
+    if (idx >= 0) lines[idx] = `${name}=${value}`;
+    else lines.push(`${name}=${value}`);
+  } else {
+    lines = [header, '', `${name}=${value}`];
+  }
+  writeFileSync(path, lines.join('\n') + '\n', 'utf8');
+}
+
+/**
+ * The Supabase send-email Auth hook (ADR-0005) is signed with a Standard
+ * Webhooks secret that GoTrue and the Next hook route must share. GoTrue reads
+ * it from `supabase/.env` via `env(SEND_EMAIL_HOOK_SECRET)` in config.toml, so
+ * the value must exist BEFORE `supabase start`. Returns it so the web
+ * `.env.local` is written with the same value. Idempotent: an existing secret
+ * is reused, never rotated.
+ */
+function ensureHookSecret(): string {
+  const webEnvPath = resolve(repoRoot, 'apps/web/.env.local');
+  const supabaseEnvPath = resolve(repoRoot, 'supabase/.env');
+  const secret =
+    readEnvVar(webEnvPath, 'SEND_EMAIL_HOOK_SECRET') ||
+    readEnvVar(supabaseEnvPath, 'SEND_EMAIL_HOOK_SECRET') ||
+    `v1,whsec_${randomBytes(32).toString('base64')}`;
+  upsertEnvVar(
+    supabaseEnvPath,
+    'SEND_EMAIL_HOOK_SECRET',
+    secret,
+    '# Local secrets read by the Supabase CLI for env() substitution in\n# supabase/config.toml. Gitignored; prod uses platform envs, not this file.',
+  );
+  return secret;
+}
+
+function writeEnvLocal(target: Target, supabase: Map<string, string>, hookSecret: string): void {
   const path = resolve(repoRoot, target.envPath);
   const existing = new Map<string, string>();
   if (existsSync(path)) {
@@ -81,6 +128,10 @@ function writeEnvLocal(target: Target, supabase: Map<string, string>): void {
       value = '127.0.0.1';
     } else if (v.name === 'SMTP_PORT') {
       value = '54425';
+    } else if (v.name === 'SEND_EMAIL_HOOK_SECRET') {
+      // Web-only. Mirrored into supabase/.env by ensureHookSecret() so GoTrue
+      // (signs the hook request) and the route (verifies it) share one value.
+      value = hookSecret;
     } else {
       value = v.example ?? '';
     }
@@ -94,13 +145,16 @@ function writeEnvLocal(target: Target, supabase: Map<string, string>): void {
 
 async function main(): Promise<void> {
   run('pnpm install', 'pnpm', ['install', '--frozen-lockfile']);
+  // Mint/mirror the send-email hook secret into supabase/.env BEFORE start so
+  // GoTrue boots with a valid `auth.hook.send_email.secrets`.
+  const hookSecret = ensureHookSecret();
   run('supabase start', 'pnpm', ['exec', 'supabase', 'start']);
   run('supabase db reset', 'pnpm', ['exec', 'supabase', 'db', 'reset']);
   run('pnpm db:types', 'pnpm', ['db:types']);
   run('pnpm env:example', 'pnpm', ['env:example']);
 
   const status = readSupabaseStatus();
-  for (const target of targets) writeEnvLocal(target, status);
+  for (const target of targets) writeEnvLocal(target, status, hookSecret);
 
   console.warn('\n✔ setup complete — `pnpm dev` to run the apps and workers.');
 }
