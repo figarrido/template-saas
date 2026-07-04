@@ -24,6 +24,11 @@ export type ChangePasswordResult = ActionResult<{ message: string }>;
  * side; HIBP server-side via Supabase). `weak_password` is surfaced as
  * `invalid-input` with the Supabase-provided message so the User can pick
  * a different one.
+ *
+ * On success every OTHER Session for the User is revoked (`scope: 'others'`),
+ * matching the reset-password flow (`updatePassword`). A password change is
+ * the canonical "lock every other device out" action, so this device stays
+ * signed in and all others are torn down. See ADR-0003.
  */
 export async function changePassword(
   client: AuthClient,
@@ -63,6 +68,14 @@ export async function changePassword(
     }
     return { ok: false, error: AUTH_MESSAGES.unexpected, code: 'unexpected' };
   }
+
+  // Revoke every OTHER Session for this User (ADR-0003) — the same posture
+  // the reset-password flow takes. Keeping `scope: 'others'` leaves the
+  // current device signed in (it just re-authenticated) and tears down every
+  // other Session. Best-effort: the password change already succeeded, so a
+  // failure here still reports success; a stale Session elsewhere dies on its
+  // next refresh regardless.
+  await client.auth.signOut({ scope: 'others' });
 
   return { ok: true, data: { message: AUTH_MESSAGES.passwordChanged } };
 }

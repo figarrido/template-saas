@@ -577,9 +577,9 @@ describe('changePassword flow', () => {
     };
   }
 
-  it('re-authenticates with the current password and updates to the new one', async () => {
+  it('re-authenticates, updates the password, and revokes other Sessions while keeping this device signed in', async () => {
     let reauthArgs: { email: string; password: string } | undefined;
-    let updateArgs: { password?: string } | undefined;
+    const calls: Array<{ fn: string; args: unknown }> = [];
     const client = fakeClient({
       getUser: async () => emailIdentityUser(),
       signInWithPassword: async (args) => {
@@ -587,8 +587,12 @@ describe('changePassword flow', () => {
         return { data: { user: { id: 'user-1' }, session: { access_token: 't' } }, error: null };
       },
       updateUser: async (args) => {
-        updateArgs = args;
+        calls.push({ fn: 'updateUser', args });
         return { data: { user: { id: 'user-1' } }, error: null };
+      },
+      signOut: async (args) => {
+        calls.push({ fn: 'signOut', args });
+        return { error: null };
       },
     });
 
@@ -601,7 +605,12 @@ describe('changePassword flow', () => {
     if (!result.ok) return;
     expect(result.data.message).toMatch(/updated/i);
     expect(reauthArgs).toEqual({ email: EMAIL, password: CURRENT });
-    expect(updateArgs).toEqual({ password: NEW_STRONG });
+    // updateUser precedes the revocation, and the revocation targets other
+    // devices only (scope: 'others') so this session survives.
+    expect(calls).toEqual([
+      { fn: 'updateUser', args: { password: NEW_STRONG } },
+      { fn: 'signOut', args: { scope: 'others' } },
+    ]);
   });
 
   it('rejects a wrong current password with a generic error and never calls updateUser', async () => {
