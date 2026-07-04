@@ -54,13 +54,14 @@ function payload(type: SendEmailHookPayload['email_data']['email_action_type']) 
 
 describe('buildAuthEmail', () => {
   it('builds a VerifyEmail with /auth/confirm URL for signup', async () => {
-    const msg = buildAuthEmail(payload('signup'), { siteUrl: SITE_URL, from: FROM });
-    expect(msg).not.toBeNull();
-    expect(msg!.to).toBe('user@example.com');
-    expect(msg!.from).toBe(FROM);
-    expect(msg!.subject).toMatch(/confirm/i);
+    const msgs = buildAuthEmail(payload('signup'), { siteUrl: SITE_URL, from: FROM });
+    expect(msgs).toHaveLength(1);
+    const msg = msgs[0]!;
+    expect(msg.to).toBe('user@example.com');
+    expect(msg.from).toBe(FROM);
+    expect(msg.subject).toMatch(/confirm/i);
 
-    const html = await render(msg!.react!);
+    const html = await render(msg.react!);
     expect(html).toContain('https://app.test/auth/confirm');
     expect(html).toContain('token_hash=tk_abc123');
     expect(html).toContain('type=signup');
@@ -68,18 +69,60 @@ describe('buildAuthEmail', () => {
   });
 
   it('uses PasswordResetEmail for recovery', async () => {
-    const msg = buildAuthEmail(payload('recovery'), { siteUrl: SITE_URL, from: FROM });
-    expect(msg!.subject).toMatch(/reset/i);
-    const html = await render(msg!.react!);
+    const msg = buildAuthEmail(payload('recovery'), { siteUrl: SITE_URL, from: FROM })[0]!;
+    expect(msg.subject).toMatch(/reset/i);
+    const html = await render(msg.react!);
     expect(html).toContain('type=recovery');
   });
 
   it('uses VerifyEmail with an invite-specific subject for invite', async () => {
-    const msg = buildAuthEmail(payload('invite'), { siteUrl: SITE_URL, from: FROM });
-    expect(msg!.subject).toMatch(/invit/i);
+    const msg = buildAuthEmail(payload('invite'), { siteUrl: SITE_URL, from: FROM })[0]!;
+    expect(msg.subject).toMatch(/invit/i);
   });
 
-  it('returns null for an unknown email_action_type', () => {
+  it('builds TWO confirmations for a double-confirm email change — new + current address', async () => {
+    const emailChange = {
+      user: { email: 'old@example.com', new_email: 'new@example.com' },
+      email_data: {
+        token_hash: 'tk_current',
+        token_hash_new: 'tk_new',
+        redirect_to: '/dashboard',
+        email_action_type: 'email_change',
+        site_url: SITE_URL,
+      },
+    } satisfies SendEmailHookPayload;
+
+    const msgs = buildAuthEmail(emailChange, { siteUrl: SITE_URL, from: FROM });
+    expect(msgs).toHaveLength(2);
+    const byTo = Object.fromEntries(msgs.map((m) => [m.to as string, m]));
+
+    // The NEW address gets the new-side token — this is the message that was
+    // never sent before the fix.
+    const newHtml = await render(byTo['new@example.com']!.react!);
+    expect(newHtml).toContain('token_hash=tk_new');
+    expect(newHtml).toContain('type=email_change');
+
+    // The CURRENT address authorises the change with the current-side token.
+    const oldHtml = await render(byTo['old@example.com']!.react!);
+    expect(oldHtml).toContain('token_hash=tk_current');
+    expect(oldHtml).toContain('type=email_change');
+  });
+
+  it('sends a single email change confirmation when double-confirm is off (one token)', () => {
+    const singleConfirm = {
+      user: { email: 'old@example.com', new_email: 'new@example.com' },
+      email_data: {
+        token_hash: 'tk_only',
+        email_action_type: 'email_change',
+        site_url: SITE_URL,
+      },
+    } satisfies SendEmailHookPayload;
+    const msgs = buildAuthEmail(singleConfirm, { siteUrl: SITE_URL, from: FROM });
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]!.to).toBe('new@example.com');
+  });
+
+  it('returns [] for an unknown email_action_type', () => {
     const bogus = {
       user: { email: 'x@y.test' },
       email_data: {
@@ -87,7 +130,7 @@ describe('buildAuthEmail', () => {
         email_action_type: 'reauthentication' as unknown as 'signup',
       },
     } satisfies SendEmailHookPayload;
-    expect(buildAuthEmail(bogus, { siteUrl: SITE_URL, from: FROM })).toBeNull();
+    expect(buildAuthEmail(bogus, { siteUrl: SITE_URL, from: FROM })).toEqual([]);
   });
 });
 
@@ -133,6 +176,34 @@ describe('handleSendEmailHook', () => {
     expect(result.ok).toBe(true);
     expect(provider.sent).toHaveLength(1);
     expect(provider.sent[0]?.to).toBe('user@example.com');
+  });
+
+  it('sends two emails for a double-confirm email change (current + new address)', async () => {
+    const provider = recordingProvider();
+    const body = JSON.stringify({
+      user: { email: 'old@example.com', new_email: 'new@example.com' },
+      email_data: {
+        token_hash: 'tk_current',
+        token_hash_new: 'tk_new',
+        email_action_type: 'email_change',
+        site_url: SITE_URL,
+      },
+    });
+    const headers = signedHeaders('msg_ec', '1700000002', body);
+
+    const result = await handleSendEmailHook(body, headers, {
+      secret: SECRET,
+      siteUrl: SITE_URL,
+      from: FROM,
+      provider,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(provider.sent).toHaveLength(2);
+    expect(provider.sent.map((m) => m.to as string).sort()).toEqual([
+      'new@example.com',
+      'old@example.com',
+    ]);
   });
 
   it('returns 401 when signature is missing', async () => {
