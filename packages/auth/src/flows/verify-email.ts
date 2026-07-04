@@ -21,6 +21,13 @@ export function isEmailOtpType(value: unknown): value is EmailOtpType {
  * lands the User signed in. On failure (expired / already-used / malformed
  * link) we surface a single non-leaky "no longer valid" message — the UI
  * pairs it with a resend affordance.
+ *
+ * `email_change` is the one type that can succeed WITHOUT returning a user:
+ * with `double_confirm_changes = true` the change is verified in two clicks
+ * (current + new address), and the first confirmation succeeds but yields no
+ * user/session because the swap only applies once BOTH links are used. That
+ * partial confirmation is a valid link, not a broken one, so it must not be
+ * mapped to the "no longer valid" error. Every other type must return a user.
  */
 export async function verifyEmailToken(
   client: AuthClient,
@@ -35,9 +42,9 @@ export async function verifyEmailToken(
     token_hash: input.tokenHash,
   });
 
-  if (error || !data?.user) {
+  if (error || (!data?.user && input.type !== 'email_change')) {
     return { ok: false, error: AUTH_MESSAGES.confirmLinkInvalid, code: 'invalid-credentials' };
   }
 
-  return { ok: true, data: { userId: data.user.id } };
+  return { ok: true, data: { userId: data?.user?.id ?? '' } };
 }

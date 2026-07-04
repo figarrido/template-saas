@@ -313,6 +313,29 @@ describe('verifyEmailToken flow', () => {
     expect(result.error).toMatch(/no longer valid/i);
   });
 
+  it('accepts a double-confirm email_change that verifies without a user (partial confirmation)', async () => {
+    // With double_confirm_changes on, the first of the two confirmations
+    // succeeds but returns no user — the swap isn't complete until the second
+    // link. That's a valid link, not a broken one.
+    const client = fakeClient({
+      verifyOtp: async () => ({ data: { user: null, session: null }, error: null }),
+    });
+    const result = await verifyEmailToken(client, { tokenHash: 'hash-1', type: 'email_change' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.userId).toBe('');
+  });
+
+  it('still rejects a no-user result for non-email_change types', async () => {
+    const client = fakeClient({
+      verifyOtp: async () => ({ data: { user: null, session: null }, error: null }),
+    });
+    const result = await verifyEmailToken(client, { tokenHash: 'hash-1', type: 'signup' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toMatch(/no longer valid/i);
+  });
+
   it('rejects an empty token_hash without hitting Supabase', async () => {
     let calls = 0;
     const client = fakeClient({

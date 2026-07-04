@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { isEmailOtpType, verifyEmailToken } from '@template/auth';
-import { getRequestClient } from '@/lib/supabase/server';
+import { getConfirmClient } from '@/lib/supabase/server';
 
 // Verifies the one-time `token_hash` carried by Supabase auth emails — the
 // `{{ .TokenHash }}` template style configured in supabase/config.toml.
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     return redirectInvalid(req, rawType);
   }
 
-  const client = await getRequestClient();
+  const client = await getConfirmClient();
   const result = await verifyEmailToken(client, { tokenHash, type: rawType });
 
   if (!result.ok) {
