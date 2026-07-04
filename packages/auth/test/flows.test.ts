@@ -270,6 +270,23 @@ describe('signUp flow', () => {
     if (result.ok) return;
     expect(result.code).toBe('unexpected');
   });
+
+  it('collapses a hard `user_already_exists` error onto the generic success (no enumeration leak)', async () => {
+    // Newer GoTrue returns a 422 user_already_exists for an existing confirmed
+    // account instead of the obfuscated empty-identities user. ADR-0002: the
+    // result must be indistinguishable from a fresh sign-up.
+    const client = fakeClient({
+      signUp: async () =>
+        ({
+          data: { user: null, session: null },
+          error: { code: 'user_already_exists', message: 'User already registered' },
+        }),
+    });
+    const result = await signUp(client, { email: EMAIL, password: PASSWORD });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.message).toMatch(/check your email/i);
+  });
 });
 
 describe('verifyEmailToken flow', () => {
