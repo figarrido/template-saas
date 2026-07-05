@@ -77,12 +77,10 @@ jobs:
     # § Testing names this as the "load-bearing safety net".
     runs-on: ubuntu-latest
     env:
-      # `supabase start` validates every configured auth hook against its
-      # secret before booting. The send_email hook (supabase/config.toml) reads
-      # env(SEND_EMAIL_HOOK_SECRET); locally `pnpm setup` writes it to
-      # supabase/.env, but CI never runs setup — so supply a valid-format
-      # placeholder. Not a real secret: the hook endpoint isn't served in this
-      # job, and the auth integration flows tolerate its absence.
+      # `supabase start` validates the send_email hook's secret before booting
+      # (config.toml reads env(SEND_EMAIL_HOOK_SECRET)). `pnpm setup` writes it
+      # to supabase/.env locally, but CI never runs setup — so supply a
+      # valid-format placeholder. Not a real secret.
       SEND_EMAIL_HOOK_SECRET: 'v1,whsec_dGVtcGxhdGUtc2Fhcy1jaS1wbGFjZWhvbGRlci0zMmJh'
     steps:
       - uses: actions/checkout@v4
@@ -95,6 +93,14 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Disable the send_email hook for the test stack. It POSTs auth emails to
+      # the Next hook at host.docker.internal:3000, which this job doesn't serve,
+      # so GoTrue's signUp/changeEmail dispatch would fail. Disabled, GoTrue uses
+      # its built-in templates → Mailpit — matching prod's "dispatch succeeds"
+      # path. The hook's own logic is covered by packages/email unit tests, and
+      # the auth integration suite mints tokens via the admin API, not real mail.
+      - name: Disable send_email hook for the CI stack
+        run: perl -0pi -e 's/(\[auth\.hook\.send_email\]\nenabled = )true/${1}false/' supabase/config.toml
       # Foreground start: blocks until every service is healthy and fails loudly
       # (with the container error in this step's log) if one can't come up. The
       # previous background-start + `until supabase status` poll raced — status
