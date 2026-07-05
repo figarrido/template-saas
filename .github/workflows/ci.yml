@@ -86,27 +86,21 @@ jobs:
       SEND_EMAIL_HOOK_SECRET: 'v1,whsec_dGVtcGxhdGUtc2Fhcy1jaS1wbGFjZWhvbGRlci0zMmJh'
     steps:
       - uses: actions/checkout@v4
-      # Install the CLI globally before pnpm install so we can start Supabase
-      # in the background and overlap image-pulling with the pnpm setup steps.
       - uses: supabase/setup-cli@v1
         with:
           version: ${{ env.SUPABASE_VERSION }}
-      - name: Start Supabase (background)
-        run: nohup supabase start > /tmp/supabase-start.log 2>&1 &
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Wait for Supabase
-        run: |
-          timeout 420 bash -c 'until supabase status 2>/dev/null; do sleep 3; done'
-      # Surface why `supabase start` never came up — the background process
-      # logs here and is otherwise invisible when the wait above times out.
-      - name: Supabase start log (on failure)
-        if: failure()
-        run: cat /tmp/supabase-start.log || echo '(no /tmp/supabase-start.log)'
+      # Foreground start: blocks until every service is healthy and fails loudly
+      # (with the container error in this step's log) if one can't come up. The
+      # previous background-start + `until supabase status` poll raced — status
+      # returns 0 once the DB is reachable, ahead of the API/Kong on :54421, so
+      # the poll broke early and db:types:check hit a not-yet-ready API in CI.
+      - run: supabase start
       - run: pnpm db:types:check
       - run: pnpm db:introspect:check
       - run: pnpm -F @template/db test:rls
