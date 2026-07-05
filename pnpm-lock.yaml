@@ -14,6 +14,9 @@ importers:
       '@changesets/cli':
         specifier: ^2.27.0
         version: 2.31.0(@types/node@22.19.21)
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
       '@stripe/cli':
         specifier: 1.42.13
         version: 1.42.13
@@ -3135,6 +3138,9 @@ packages:
 
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
+
+  '@standard-schema/spec@1.1.0':
+    resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
   '@stripe/cli-darwin-arm64@1.42.13':
     resolution: {integrity: sha512-k0Wnk6M8et77rHqJrHxqzK0Mtsfmc3BGj5RWaoYgp526JQ397Uge7qdedt9IDbzC/U7TwoYh0QqVHUW1s58FRg==}
@@ -9530,6 +9536,8 @@ snapshots:
   '@sindresorhus/merge-streams@4.0.0': {}
 
   '@socket.io/component-emitter@3.1.2': {}
+
+  '@standard-schema/spec@1.1.0': {}
 
   '@stripe/cli-darwin-arm64@1.42.13':
     optional: true

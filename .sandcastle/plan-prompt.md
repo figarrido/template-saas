@@ -14,6 +14,8 @@ The list above has already been filtered to issues ready for work.
 
 Analyze the open issues and build a dependency graph. For each issue, determine whether it **blocks** or **is blocked by** any other open issue.
 
+You have the repository checked out. When it is unclear whether two issues touch the same files or modules, inspect the code to find out instead of guessing.
+
 An issue B is **blocked by** issue A if:
 
 - B requires code or infrastructure that A introduces
@@ -32,6 +34,8 @@ Output your plan as a JSON object wrapped in `<plan>` tags:
 {"issues": [{"id": "42", "title": "Fix auth bug", "branch": "sandcastle/issue-42"}]}
 </plan>
 
-Include only unblocked issues. If every issue is blocked, include the single highest-priority candidate (the one with the fewest or weakest dependencies).
+Include only unblocked issues, ordered most-important-first: put issues that unblock the most other issues (or carry the highest priority labels) at the top. The orchestrator caps how many run in parallel and takes them from the top of your list.
+
+If every issue is blocked, include the single highest-priority candidate (the one with the fewest or weakest dependencies).
 
 Always emit the `<plan>` tags, even when there is nothing to do. If there are no issues to work on at all, output `<plan>{"issues": []}</plan>` so the run can exit cleanly.

@@ -27,12 +27,14 @@
     "jobs:codegen": "turbo run jobs:codegen",
     "jobs:codegen:check": "turbo run jobs:codegen:check",
     "supabase:promote-pr": "tsx scripts/promote-pr.ts",
+    "sandcastle": "tsx .sandcastle/main.mts",
     "changeset": "changeset",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""
   },
   "devDependencies": {
     "@ai-hero/sandcastle": "^0.10.0",
     "@changesets/cli": "^2.27.0",
+    "@standard-schema/spec": "^1.1.0",
     "@stripe/cli": "1.42.13",
     "portless": "^0.14.0",
     "prettier": "^3.3.0",
