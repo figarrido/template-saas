@@ -93,7 +93,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Wait for Supabase
         run: |
-          timeout 300 bash -c 'until supabase status 2>/dev/null; do sleep 3; done'
+          timeout 420 bash -c 'until supabase status 2>/dev/null; do sleep 3; done'
+      # Surface why `supabase start` never came up — the background process
+      # logs here and is otherwise invisible when the wait above times out.
+      - name: Supabase start log (on failure)
+        if: failure()
+        run: cat /tmp/supabase-start.log || echo '(no /tmp/supabase-start.log)'
       - run: pnpm db:types:check
       - run: pnpm db:introspect:check
       - run: pnpm -F @template/db test:rls
