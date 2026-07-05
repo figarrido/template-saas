@@ -15,7 +15,6 @@ concurrency:
 
 env:
   NODE_VERSION: 22
-  PNPM_VERSION: 9.15.4
   # Keep in sync with the `supabase` version in package.json.
   SUPABASE_VERSION: 2.107.0
 
@@ -25,8 +24,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -39,8 +36,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -53,8 +48,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -63,15 +56,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # Excludes test:rls which needs the live Supabase stack; that runs in
       # the `migration-validation` job below and again on main.
-      - run: pnpm -r --filter='!@template/db' test --if-present
+      - run: pnpm -r --filter='!@template/db' --if-present run test
 
   env-drift:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -95,8 +86,6 @@ jobs:
       - name: Start Supabase (background)
         run: nohup supabase start > /tmp/supabase-start.log 2>&1 &
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
