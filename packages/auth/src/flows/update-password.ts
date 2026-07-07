@@ -1,5 +1,10 @@
 import { updatePasswordSchema, type UpdatePasswordInput } from '../schemas.js';
-import { isWeakPasswordError } from './errors.js';
+import {
+  invalidInputFirstIssue,
+  isSessionMissingError,
+  isWeakPasswordError,
+  weakPasswordResult,
+} from './errors.js';
 import { AUTH_MESSAGES } from './messages.js';
 import type { ActionResult, AuthClient } from './types.js';
 
@@ -29,14 +34,7 @@ export async function updatePassword(
   input: UpdatePasswordInput,
 ): Promise<UpdatePasswordResult> {
   const parsed = updatePasswordSchema.safeParse(input);
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    return {
-      ok: false,
-      error: issue?.message ?? AUTH_MESSAGES.invalidInput,
-      code: 'invalid-input',
-    };
-  }
+  if (!parsed.success) return invalidInputFirstIssue(parsed.error);
 
   // Cheap pre-check: if there's no Session, supabase-js will still POST
   // updateUser and get back an AuthSessionMissingError — but failing fast
@@ -53,13 +51,7 @@ export async function updatePassword(
 
   const { error } = await client.auth.updateUser({ password: parsed.data.password });
   if (error) {
-    if (isWeakPasswordError(error)) {
-      return {
-        ok: false,
-        error: error.message || AUTH_MESSAGES.weakPassword,
-        code: 'invalid-input',
-      };
-    }
+    if (isWeakPasswordError(error)) return weakPasswordResult(error);
     if (isSessionMissingError(error)) {
       return {
         ok: false,
@@ -78,15 +70,4 @@ export async function updatePassword(
   await client.auth.signOut({ scope: 'others' });
 
   return { ok: true, data: { message: AUTH_MESSAGES.passwordUpdated } };
-}
-
-function isSessionMissingError(error: {
-  code?: string | undefined;
-  message?: string;
-  name?: string;
-}): boolean {
-  if (error.code === 'session_not_found' || error.code === 'no_session') return true;
-  if (error.name === 'AuthSessionMissingError') return true;
-  const message = error.message ?? '';
-  return /session\b.*\bmissing|missing\b.*\bsession|no\s+session/i.test(message);
 }

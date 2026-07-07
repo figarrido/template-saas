@@ -1,4 +1,5 @@
 import { signInSchema, type SignInInput } from '../schemas.js';
+import { invalidInputGeneric, isNotConfirmedError } from './errors.js';
 import { AUTH_MESSAGES } from './messages.js';
 import type { ActionResult, AuthClient } from './types.js';
 
@@ -22,9 +23,8 @@ export type SignInResult = ActionResult<{ userId: string }>;
  */
 export async function signIn(client: AuthClient, input: SignInInput): Promise<SignInResult> {
   const parsed = signInSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: AUTH_MESSAGES.invalidInput, code: 'invalid-input' };
-  }
+  // Generic policy: a malformed email must read the same as a wrong one.
+  if (!parsed.success) return invalidInputGeneric();
 
   const { data, error } = await client.auth.signInWithPassword(parsed.data);
 
@@ -40,11 +40,4 @@ export async function signIn(client: AuthClient, input: SignInInput): Promise<Si
   }
 
   return { ok: true, data: { userId: data.user.id } };
-}
-
-function isNotConfirmedError(error: { code?: string | undefined; message?: string }): boolean {
-  if (error.code === 'email_not_confirmed') return true;
-  // Older supabase-js versions only expose the string. Match defensively;
-  // the integration test pins the contract.
-  return typeof error.message === 'string' && /not confirmed/i.test(error.message);
 }

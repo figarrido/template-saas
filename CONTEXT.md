@@ -33,6 +33,10 @@ _Avoid_: Login (as a noun for this state), Token
 Re-proving identity by re-entering the current password immediately before a sensitive change (changing password or email). Distinct from sign-in: the User already holds a Session — re-authentication guards the specific action, not access to the app.
 _Avoid_: Confirm-password, Step-up (reserve "step-up" for MFA)
 
+**Flow Error Contract**:
+The single set of rules governing what an auth flow reveals when it fails. Every failure surfaces through one of three named policies — **generic error** (reveal only that the attempt failed), **first-issue error** (reveal what was wrong with the input, where that cannot aid enumeration), or **silent success** (reveal nothing; indistinguishable from the happy path) — and which policy a flow uses is that flow's decision, implementing the account-enumeration posture (see `docs/adr/0002`).
+_Avoid_: error handling, error mapping (implementation vocabulary — the contract is about what is revealed, not how)
+
 ### Organization & roles
 
 **Organization**:

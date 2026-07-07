@@ -1,5 +1,10 @@
 import { signUpSchema, type SignUpInput } from '../schemas.js';
-import { isUserAlreadyExistsError, isWeakPasswordError } from './errors.js';
+import {
+  invalidInputFirstIssue,
+  isUserAlreadyExistsError,
+  isWeakPasswordError,
+  weakPasswordResult,
+} from './errors.js';
 import { AUTH_MESSAGES } from './messages.js';
 import type { ActionResult, AuthClient } from './types.js';
 
@@ -39,14 +44,7 @@ export async function signUp(
   options: SignUpOptions = {},
 ): Promise<SignUpResult> {
   const parsed = signUpSchema.safeParse(input);
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    return {
-      ok: false,
-      error: issue?.message ?? AUTH_MESSAGES.invalidInput,
-      code: 'invalid-input',
-    };
-  }
+  if (!parsed.success) return invalidInputFirstIssue(parsed.error);
 
   const { error } = await client.auth.signUp({
     email: parsed.data.email,
@@ -55,13 +53,7 @@ export async function signUp(
   });
 
   if (error) {
-    if (isWeakPasswordError(error)) {
-      return {
-        ok: false,
-        error: error.message || AUTH_MESSAGES.weakPassword,
-        code: 'invalid-input',
-      };
-    }
+    if (isWeakPasswordError(error)) return weakPasswordResult(error);
     // ADR-0002: an already-registered address must be indistinguishable from a
     // fresh sign-up. Collapse the hard `user_already_exists` error onto the
     // same generic "check your email" success the fresh path returns.
