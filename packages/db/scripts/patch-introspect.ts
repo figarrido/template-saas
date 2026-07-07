@@ -90,13 +90,46 @@ function topoSortBlocks(blocks: ExportBlock[]): ExportBlock[] {
   return result;
 }
 
+// Sort the members inside a single pgTable block's `(table) => { return { … } }`
+// object alphabetically by key. drizzle-kit emits constraints/indexes/policies
+// in Postgres OID order, which differs between a fresh container (CI) and a
+// reset one (local) — most visibly the RLS pgPolicy entries. Sorting here makes
+// the output deterministic regardless of row order. Multi-line members (e.g.
+// foreignKey({ … })) stay intact: we only split at top-level `\n\t\t<key>:`
+// boundaries (nested lines are indented deeper) and every member carries a
+// trailing comma, so reordering is safe.
+function sortTableBlockMembers(blockText: string): string {
+  const marker = blockText.indexOf('=> {');
+  if (marker === -1) return blockText;
+  const retIdx = blockText.indexOf('return {', marker);
+  if (retIdx === -1) return blockText;
+  const objStart = retIdx + 'return {'.length;
+  const closeIdx = blockText.indexOf('\n\t}', objStart);
+  if (closeIdx === -1) return blockText;
+
+  const prefix = blockText.slice(0, objStart);
+  const membersContent = blockText.slice(objStart, closeIdx);
+  const suffix = blockText.slice(closeIdx);
+
+  const chunks = membersContent.split(/(?=\n\t\t\w)/).filter(c => c.length > 0);
+  if (chunks.length <= 1) return blockText;
+
+  const members = chunks.map(chunk => {
+    const m = /^\n\t\t(\w+):/.exec(chunk);
+    return { name: m?.[1] ?? '', text: chunk };
+  });
+  members.sort((a, b) => a.name.localeCompare(b.name));
+  return prefix + members.map(m => m.text).join('') + suffix;
+}
+
 function sortSchemaExports(schema: string): string {
   const first = /^export const \w+ = pgTable\(/m.exec(schema);
   if (!first) return schema;
   const header = schema.slice(0, first.index);
   const body = schema.slice(first.index);
   const blocks = extractExportBlocks(body, 'pgTable');
-  const sorted = topoSortBlocks(blocks);
+  const normalised = blocks.map(b => ({ ...b, text: sortTableBlockMembers(b.text) }));
+  const sorted = topoSortBlocks(normalised);
   return header + sorted.map(b => b.text).join('\n\n') + '\n';
 }
 
