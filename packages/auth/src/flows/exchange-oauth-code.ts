@@ -1,3 +1,4 @@
+import { invalidInputGeneric } from './errors.js';
 import { AUTH_MESSAGES } from './messages.js';
 import type { ActionResult, AuthClient } from './types.js';
 
@@ -19,9 +20,7 @@ export async function exchangeOAuthCode(
   client: AuthClient,
   code: string,
 ): Promise<ExchangeOAuthCodeResult> {
-  if (!code) {
-    return { ok: false, error: AUTH_MESSAGES.invalidInput, code: 'invalid-input' };
-  }
+  if (!code) return invalidInputGeneric();
 
   const { data, error } = await client.auth.exchangeCodeForSession(code);
 

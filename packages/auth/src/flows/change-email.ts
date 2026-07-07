@@ -1,4 +1,5 @@
 import { changeEmailSchema, type ChangeEmailInput } from '../schemas.js';
+import { invalidInputFirstIssue } from './errors.js';
 import { AUTH_MESSAGES } from './messages.js';
 import { getAuthenticatedUser, reauthenticateUser } from './reauth.js';
 import type { ActionResult, AuthClient } from './types.js';
@@ -51,14 +52,7 @@ export async function changeEmail(
   options: ChangeEmailOptions = {},
 ): Promise<ChangeEmailResult> {
   const parsed = changeEmailSchema.safeParse(input);
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    return {
-      ok: false,
-      error: issue?.message ?? AUTH_MESSAGES.invalidInput,
-      code: 'invalid-input',
-    };
-  }
+  if (!parsed.success) return invalidInputFirstIssue(parsed.error);
 
   const authResult = await getAuthenticatedUser(client);
   if (!authResult.ok) return authResult;

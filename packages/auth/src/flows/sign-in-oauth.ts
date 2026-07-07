@@ -1,4 +1,5 @@
 import { PROVIDERS, type OAuthProvider } from '../providers.js';
+import { invalidInputGeneric } from './errors.js';
 import { AUTH_MESSAGES } from './messages.js';
 import type { ActionResult, AuthClient } from './types.js';
 
@@ -23,9 +24,7 @@ export async function signInOAuth(
   client: AuthClient,
   input: SignInOAuthInput,
 ): Promise<SignInOAuthResult> {
-  if (!isKnownProvider(input.provider)) {
-    return { ok: false, error: AUTH_MESSAGES.invalidInput, code: 'invalid-input' };
-  }
+  if (!isKnownProvider(input.provider)) return invalidInputGeneric();
 
   const { data, error } = await client.auth.signInWithOAuth({
     provider: input.provider,
