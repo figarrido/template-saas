@@ -15,7 +15,6 @@ concurrency:
 
 env:
   NODE_VERSION: 22
-  PNPM_VERSION: 9.15.4
   # Keep in sync with the `supabase` version in package.json.
   SUPABASE_VERSION: 2.107.0
 
@@ -25,8 +24,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -39,8 +36,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -53,8 +48,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -63,15 +56,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # Excludes test:rls which needs the live Supabase stack; that runs in
       # the `migration-validation` job below and again on main.
-      - run: pnpm -r --filter='!@template/db' test --if-present
+      - run: pnpm -r --filter='!@template/db' --if-present run test
 
   env-drift:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -85,26 +76,37 @@ jobs:
     # so a buggy policy lands here, not in main. docs/architecture/02-data.md
     # § Testing names this as the "load-bearing safety net".
     runs-on: ubuntu-latest
+    env:
+      # `supabase start` validates the send_email hook's secret before booting
+      # (config.toml reads env(SEND_EMAIL_HOOK_SECRET)). `pnpm setup` writes it
+      # to supabase/.env locally, but CI never runs setup — so supply a
+      # valid-format placeholder. Not a real secret.
+      SEND_EMAIL_HOOK_SECRET: 'v1,whsec_dGVtcGxhdGUtc2Fhcy1jaS1wbGFjZWhvbGRlci0zMmJh'
     steps:
       - uses: actions/checkout@v4
-      # Install the CLI globally before pnpm install so we can start Supabase
-      # in the background and overlap image-pulling with the pnpm setup steps.
       - uses: supabase/setup-cli@v1
         with:
           version: ${{ env.SUPABASE_VERSION }}
-      - name: Start Supabase (background)
-        run: nohup supabase start > /tmp/supabase-start.log 2>&1 &
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Wait for Supabase
-        run: |
-          timeout 300 bash -c 'until supabase status 2>/dev/null; do sleep 3; done'
+      # Disable the send_email hook for the test stack. It POSTs auth emails to
+      # the Next hook at host.docker.internal:3000, which this job doesn't serve,
+      # so GoTrue's signUp/changeEmail dispatch would fail. Disabled, GoTrue uses
+      # its built-in templates → Mailpit — matching prod's "dispatch succeeds"
+      # path. The hook's own logic is covered by packages/email unit tests, and
+      # the auth integration suite mints tokens via the admin API, not real mail.
+      - name: Disable send_email hook for the CI stack
+        run: perl -0pi -e 's/(\[auth\.hook\.send_email\]\nenabled = )true/${1}false/' supabase/config.toml
+      # Foreground start: blocks until every service is healthy and fails loudly
+      # (with the container error in this step's log) if one can't come up. The
+      # previous background-start + `until supabase status` poll raced — status
+      # returns 0 once the DB is reachable, ahead of the API/Kong on :54421, so
+      # the poll broke early and db:types:check hit a not-yet-ready API in CI.
+      - run: supabase start
       - run: pnpm db:types:check
       - run: pnpm db:introspect:check
       - run: pnpm -F @template/db test:rls

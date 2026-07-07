@@ -15,16 +15,19 @@ concurrency:
 
 env:
   NODE_VERSION: 22
-  PNPM_VERSION: 9.15.4
 
 jobs:
   full:
     runs-on: ubuntu-latest
+    env:
+      # `supabase start` validates the send_email auth hook against
+      # env(SEND_EMAIL_HOOK_SECRET) before booting; `pnpm setup` supplies it
+      # locally but CI never runs setup. Valid-format placeholder, not a real
+      # secret — see ci.yml migration-validation for the rationale.
+      SEND_EMAIL_HOOK_SECRET: 'v1,whsec_dGVtcGxhdGUtc2Fhcy1jaS1wbGFjZWhvbGRlci0zMmJh'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}

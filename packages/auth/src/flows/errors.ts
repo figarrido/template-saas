@@ -14,3 +14,17 @@ export function isWeakPasswordError(error: SupabaseAuthError): boolean {
   const message = error.message ?? '';
   return /password/i.test(message) && /(weak|breach|short|leaked|pwned)/i.test(message);
 }
+
+/**
+ * True when Supabase rejected a sign-up because the address is already
+ * registered. Newer GoTrue versions return a hard `user_already_exists`
+ * (HTTP 422) for an existing *confirmed* account instead of the obfuscated
+ * empty-`identities` user older versions returned — the sign-up flow collapses
+ * both onto the same generic success so neither leaks account existence
+ * (ADR-0002).
+ */
+export function isUserAlreadyExistsError(error: SupabaseAuthError): boolean {
+  if (error.code === 'user_already_exists' || error.code === 'email_exists') return true;
+  const message = error.message ?? '';
+  return /already\s+(registered|exists)/i.test(message);
+}

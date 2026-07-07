@@ -28,9 +28,16 @@ import type { EmailMessage, EmailProvider } from '../provider.js';
 //   }
 
 export type SendEmailHookPayload = {
-  user: { email: string };
+  user: {
+    email: string;
+    /** The address being moved to, present only during an email change. */
+    new_email?: string;
+  };
   email_data: {
     token_hash: string;
+    /** Second one-time token GoTrue issues for a double-confirm email change —
+     *  the one that verifies ownership of `user.new_email`. */
+    token_hash_new?: string;
     redirect_to?: string;
     email_action_type: 'signup' | 'recovery' | 'invite' | 'email_change' | 'magiclink';
     site_url?: string;
@@ -53,7 +60,7 @@ export type StandardWebhookHeaders = {
 };
 
 export type HandleSendEmailResult =
-  | { ok: true; sent: { to: string; subject: string } }
+  | { ok: true; sent: { to: string[]; subject: string } }
   | { ok: false; status: 400 | 401 | 422; error: string };
 
 /**
@@ -83,49 +90,101 @@ export async function handleSendEmailHook(
     return { ok: false, status: 400, error: 'invalid JSON body' };
   }
 
-  const message = buildAuthEmail(payload, config);
-  if (!message) {
+  const messages = buildAuthEmail(payload, config);
+  if (messages.length === 0) {
     return { ok: false, status: 422, error: 'unsupported email_action_type' };
   }
 
-  await config.provider.send(message);
-  return { ok: true, sent: { to: payload.user.email, subject: message.subject } };
+  // A double-confirm email change fans out to two recipients (current + new
+  // address); every other action type is a single message.
+  for (const message of messages) {
+    await config.provider.send(message);
+  }
+  return {
+    ok: true,
+    sent: { to: messages.map((m) => recipient(m)), subject: messages[0]!.subject },
+  };
+}
+
+function recipient(message: EmailMessage): string {
+  return Array.isArray(message.to) ? message.to.join(', ') : message.to;
 }
 
 /**
- * Render the right React Email template for a given Supabase auth email
- * payload. Exported separately so unit tests can pin the URL-shape per
- * action type without exercising HMAC + provider send.
+ * Render the auth email(s) for a given Supabase send-email payload. Returns a
+ * list because a double-confirm email change fans out to two recipients (the
+ * current address and the new one); every other action type is a single
+ * message. An empty list means "unsupported action type". Exported separately
+ * so unit tests can pin the URL-shape per action type without exercising
+ * HMAC + provider send.
  */
 export function buildAuthEmail(
   payload: SendEmailHookPayload,
   config: Pick<SendEmailHookConfig, 'siteUrl' | 'from'>,
-): EmailMessage | null {
+): EmailMessage[] {
   const { user, email_data } = payload;
   const type = email_data.email_action_type;
-  const confirmUrl = buildConfirmUrl(config.siteUrl, email_data);
 
   switch (type) {
     case 'signup':
     case 'invite':
-    case 'email_change':
     case 'magiclink':
-      return {
-        to: user.email,
-        from: config.from,
-        subject: verifySubject(type),
-        react: VerifyEmail({ verifyUrl: confirmUrl }),
-      };
+      return [verifyMessage(user.email, email_data.token_hash, type, email_data, config)];
+    case 'email_change':
+      return buildEmailChangeMessages(payload, config);
     case 'recovery':
-      return {
-        to: user.email,
-        from: config.from,
-        subject: 'Reset your password',
-        react: PasswordResetEmail({ resetUrl: confirmUrl }),
-      };
+      return [
+        {
+          to: user.email,
+          from: config.from,
+          subject: 'Reset your password',
+          react: PasswordResetEmail({
+            resetUrl: buildConfirmUrl(config.siteUrl, email_data.token_hash, type, email_data.redirect_to),
+          }),
+        },
+      ];
     default:
-      return null;
+      return [];
   }
+}
+
+/**
+ * Email-change confirmations. With `double_confirm_changes = true`, GoTrue
+ * issues a distinct token per side and expects BOTH to be verified before the
+ * swap applies: `token_hash_new` proves ownership of `user.new_email`, and
+ * `token_hash` authorises the change from the address on file. We send one
+ * message to each. (Previously the hook sent a single message to `user.email`
+ * for either token, so the new address was never confirmed and the change
+ * could never complete.) With double-confirm off, GoTrue issues one token and
+ * we deliver it to the address being confirmed.
+ */
+function buildEmailChangeMessages(
+  payload: SendEmailHookPayload,
+  config: Pick<SendEmailHookConfig, 'siteUrl' | 'from'>,
+): EmailMessage[] {
+  const { user, email_data } = payload;
+  const mk = (to: string, tokenHash: string): EmailMessage =>
+    verifyMessage(to, tokenHash, 'email_change', email_data, config);
+
+  if (email_data.token_hash_new && user.new_email) {
+    return [mk(user.new_email, email_data.token_hash_new), mk(user.email, email_data.token_hash)];
+  }
+  return [mk(user.new_email ?? user.email, email_data.token_hash)];
+}
+
+function verifyMessage(
+  to: string,
+  tokenHash: string,
+  type: 'signup' | 'invite' | 'email_change' | 'magiclink',
+  data: Pick<SendEmailHookPayload['email_data'], 'redirect_to'>,
+  config: Pick<SendEmailHookConfig, 'siteUrl' | 'from'>,
+): EmailMessage {
+  return {
+    to,
+    from: config.from,
+    subject: verifySubject(type),
+    react: VerifyEmail({ verifyUrl: buildConfirmUrl(config.siteUrl, tokenHash, type, data.redirect_to) }),
+  };
 }
 
 function verifySubject(type: 'signup' | 'invite' | 'email_change' | 'magiclink'): string {
@@ -141,14 +200,16 @@ function verifySubject(type: 'signup' | 'invite' | 'email_change' | 'magiclink')
 
 function buildConfirmUrl(
   siteUrl: string,
-  data: SendEmailHookPayload['email_data'],
+  tokenHash: string,
+  type: SendEmailHookPayload['email_data']['email_action_type'],
+  redirectTo: string | undefined,
 ): string {
   // `/auth/confirm` lives in apps/web's router. It accepts `token_hash`,
   // `type`, and an optional `next` for redirect-after-verify.
   const base = new URL('/auth/confirm', siteUrl);
-  base.searchParams.set('token_hash', data.token_hash);
-  base.searchParams.set('type', data.email_action_type);
-  if (data.redirect_to) base.searchParams.set('next', data.redirect_to);
+  base.searchParams.set('token_hash', tokenHash);
+  base.searchParams.set('type', type);
+  if (redirectTo) base.searchParams.set('next', redirectTo);
   return base.toString();
 }
 

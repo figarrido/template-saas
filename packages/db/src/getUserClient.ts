@@ -16,6 +16,16 @@ export type UserClientConfig = {
   supabaseUrl: string;
   supabasePublishableKey: string;
   cookies: CookieAdapter;
+  /**
+   * Auth flow override. Defaults to `createServerClient`'s PKCE flow, which
+   * every Server Action / RSC / OAuth-callback path relies on. `/auth/confirm`
+   * passes `'implicit'` so email one-time-link verification (`verifyOtp` with a
+   * `token_hash`) does NOT require the PKCE `code_verifier` stored in the
+   * browser that initiated the flow — a verifier that a double-confirm email
+   * change (two links, one verifier) or a link opened on another device cannot
+   * satisfy.
+   */
+  flowType?: 'pkce' | 'implicit';
 };
 
 /**
@@ -31,6 +41,7 @@ export type UserClientConfig = {
  */
 export function getUserClient(config: UserClientConfig) {
   return createServerClient<Database>(config.supabaseUrl, config.supabasePublishableKey, {
+    ...(config.flowType ? { auth: { flowType: config.flowType } } : {}),
     cookies: {
       getAll: () => config.cookies.getAll(),
       setAll: (cookies: CookieToSet[]) => config.cookies.setAll(cookies),

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { isEmailOtpType, verifyEmailToken } from '@template/auth';
-import { getRequestClient } from '@/lib/supabase/server';
+import { getConfirmClient } from '@/lib/supabase/server';
 
 // Verifies the one-time `token_hash` carried by Supabase auth emails — the
 // `{{ .TokenHash }}` template style configured in supabase/config.toml.
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     return redirectInvalid(req, rawType);
   }
 
-  const client = await getRequestClient();
+  const client = await getConfirmClient();
   const result = await verifyEmailToken(client, { tokenHash, type: rawType });
 
   if (!result.ok) {
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
   // every other type goes to the post-login router which picks the right
   // destination by Organization count.
   const destination = rawType === 'recovery' ? '/reset-password' : (next ?? '/orgs');
-  return NextResponse.redirect(new URL(destination, req.url), { status: 303 });
+  return NextResponse.redirect(new URL(destination, publicOrigin(req)), { status: 303 });
 }
 
 // A failed recovery link should send the User to /forgot-password rather
@@ -50,13 +50,27 @@ export async function GET(req: NextRequest) {
 // on /login with the resend-confirm affordance.
 function redirectInvalid(req: NextRequest, rawType: string | null): NextResponse {
   if (rawType === 'recovery') {
-    const target = new URL('/forgot-password', req.url);
+    const target = new URL('/forgot-password', publicOrigin(req));
     target.searchParams.set('reset', 'invalid');
     return NextResponse.redirect(target, { status: 303 });
   }
-  const target = new URL('/login', req.url);
+  const target = new URL('/login', publicOrigin(req));
   target.searchParams.set('confirm', 'invalid');
   return NextResponse.redirect(target, { status: 303 });
+}
+
+// Behind the local portless proxy (and any prod reverse proxy) the public
+// origin the browser used lives in x-forwarded-*; req.url only carries the
+// internal origin the proxy forwards to (e.g. http://localhost:3000).
+// Redirecting against req.url would bounce the freshly-verified User to a
+// different origin than the one that just received the Session cookie — and
+// to plain http, which drops Secure cookies — logging them straight back out.
+// Mirrors requestOrigin() in lib/actions/auth.ts.
+function publicOrigin(req: NextRequest): string {
+  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host');
+  if (!host) return new URL(req.url).origin;
+  const proto = req.headers.get('x-forwarded-proto') ?? 'https';
+  return `${proto}://${host}`;
 }
 
 // Defensive next-param sanitation: only allow same-origin app paths so an

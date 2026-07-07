@@ -1,5 +1,5 @@
 import { signUpSchema, type SignUpInput } from '../schemas.js';
-import { isWeakPasswordError } from './errors.js';
+import { isUserAlreadyExistsError, isWeakPasswordError } from './errors.js';
 import { AUTH_MESSAGES } from './messages.js';
 import type { ActionResult, AuthClient } from './types.js';
 
@@ -20,9 +20,12 @@ export type SignUpOptions = {
  * sign-up returns no Session — the User lands on a "check your email"
  * interstitial and confirms via the link before first sign-in.
  *
- * Supabase signals "already registered" by returning a user with an empty
- * `identities` array and `session: null` — the flow collapses this onto
- * the success branch deliberately. Real-owner notification (story 9) is
+ * Supabase signals "already registered" one of two ways depending on the
+ * GoTrue version: older builds return a user with an empty `identities` array
+ * and `session: null`; newer builds (and this template's local stack) return a
+ * hard `user_already_exists` error for an existing *confirmed* account. The
+ * flow collapses BOTH onto the generic success branch deliberately, so neither
+ * path leaks account existence. Real-owner notification (story 9) is
  * Supabase's responsibility; we don't override it.
  *
  * Weak-password (HIBP) and other Supabase-side validation are surfaced as
@@ -58,6 +61,12 @@ export async function signUp(
         error: error.message || AUTH_MESSAGES.weakPassword,
         code: 'invalid-input',
       };
+    }
+    // ADR-0002: an already-registered address must be indistinguishable from a
+    // fresh sign-up. Collapse the hard `user_already_exists` error onto the
+    // same generic "check your email" success the fresh path returns.
+    if (isUserAlreadyExistsError(error)) {
+      return { ok: true, data: { message: AUTH_MESSAGES.checkYourEmail } };
     }
     return { ok: false, error: AUTH_MESSAGES.unexpected, code: 'unexpected' };
   }

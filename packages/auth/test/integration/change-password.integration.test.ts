@@ -13,6 +13,9 @@ import {
 //   * correct current + new policy-compliant password → ok; new password works.
 //   * wrong current password → generic invalid-credentials; old password
 //     still works (the row wasn't touched).
+//   * a successful change revokes every OTHER Session (ADR-0003): a second
+//     device's refresh token is dead afterwards, while the changing device
+//     stays signed in.
 //
 // The OAuth-only branch is covered by the unit test in flows.test.ts; we
 // don't seed an oauth Identity here because Supabase resists creating one
@@ -86,5 +89,35 @@ describe('changePassword — integration (live Supabase)', () => {
     // The attempted new password does not.
     const newAttempt = await signIn(anonClient(), { email: EMAIL, password: STRONG_NEW });
     expect(newAttempt.ok).toBe(false);
+  });
+
+  itLive('revokes other Sessions but keeps the changing device signed in', async () => {
+    // Two independent clients = two devices, each with its own refresh token.
+    const currentDevice = anonClient();
+    const otherDevice = anonClient();
+    const onCurrent = await signIn(currentDevice, { email: EMAIL, password: INITIAL_PASSWORD });
+    const onOther = await signIn(otherDevice, { email: EMAIL, password: INITIAL_PASSWORD });
+    expect(onCurrent.ok).toBe(true);
+    expect(onOther.ok).toBe(true);
+
+    const result = await changePassword(currentDevice, {
+      currentPassword: INITIAL_PASSWORD,
+      newPassword: STRONG_NEW,
+    });
+    expect(result.ok).toBe(true);
+
+    // The changing device's Session (rotated by the silent re-auth) is intact:
+    // it can still exchange its refresh token.
+    const currentRefresh = await currentDevice.auth.refreshSession();
+    expect(currentRefresh.error).toBeNull();
+    expect(currentRefresh.data.session).not.toBeNull();
+
+    // The other device's refresh token was revoked by scope: 'others', so its
+    // refresh now fails — the next silent refresh on that device signs it out.
+    // (Access-token checks aren't reliable here: JWTs stay valid until expiry
+    // regardless of revocation; the refresh token is what carries the state.)
+    const otherRefresh = await otherDevice.auth.refreshSession();
+    expect(otherRefresh.error).not.toBeNull();
+    expect(otherRefresh.data.session).toBeNull();
   });
 });

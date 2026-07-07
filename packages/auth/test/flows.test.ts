@@ -270,6 +270,23 @@ describe('signUp flow', () => {
     if (result.ok) return;
     expect(result.code).toBe('unexpected');
   });
+
+  it('collapses a hard `user_already_exists` error onto the generic success (no enumeration leak)', async () => {
+    // Newer GoTrue returns a 422 user_already_exists for an existing confirmed
+    // account instead of the obfuscated empty-identities user. ADR-0002: the
+    // result must be indistinguishable from a fresh sign-up.
+    const client = fakeClient({
+      signUp: async () =>
+        ({
+          data: { user: null, session: null },
+          error: { code: 'user_already_exists', message: 'User already registered' },
+        }),
+    });
+    const result = await signUp(client, { email: EMAIL, password: PASSWORD });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.message).toMatch(/check your email/i);
+  });
 });
 
 describe('verifyEmailToken flow', () => {
@@ -289,6 +306,29 @@ describe('verifyEmailToken flow', () => {
   it('returns the generic "no longer valid" error when verifyOtp fails', async () => {
     const client = fakeClient({
       verifyOtp: async () => ({ data: { user: null, session: null }, error: { message: 'expired' } }),
+    });
+    const result = await verifyEmailToken(client, { tokenHash: 'hash-1', type: 'signup' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error).toMatch(/no longer valid/i);
+  });
+
+  it('accepts a double-confirm email_change that verifies without a user (partial confirmation)', async () => {
+    // With double_confirm_changes on, the first of the two confirmations
+    // succeeds but returns no user — the swap isn't complete until the second
+    // link. That's a valid link, not a broken one.
+    const client = fakeClient({
+      verifyOtp: async () => ({ data: { user: null, session: null }, error: null }),
+    });
+    const result = await verifyEmailToken(client, { tokenHash: 'hash-1', type: 'email_change' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.userId).toBe('');
+  });
+
+  it('still rejects a no-user result for non-email_change types', async () => {
+    const client = fakeClient({
+      verifyOtp: async () => ({ data: { user: null, session: null }, error: null }),
     });
     const result = await verifyEmailToken(client, { tokenHash: 'hash-1', type: 'signup' });
     expect(result.ok).toBe(false);
@@ -537,9 +577,9 @@ describe('changePassword flow', () => {
     };
   }
 
-  it('re-authenticates with the current password and updates to the new one', async () => {
+  it('re-authenticates, updates the password, and revokes other Sessions while keeping this device signed in', async () => {
     let reauthArgs: { email: string; password: string } | undefined;
-    let updateArgs: { password?: string } | undefined;
+    const calls: Array<{ fn: string; args: unknown }> = [];
     const client = fakeClient({
       getUser: async () => emailIdentityUser(),
       signInWithPassword: async (args) => {
@@ -547,8 +587,12 @@ describe('changePassword flow', () => {
         return { data: { user: { id: 'user-1' }, session: { access_token: 't' } }, error: null };
       },
       updateUser: async (args) => {
-        updateArgs = args;
+        calls.push({ fn: 'updateUser', args });
         return { data: { user: { id: 'user-1' } }, error: null };
+      },
+      signOut: async (args) => {
+        calls.push({ fn: 'signOut', args });
+        return { error: null };
       },
     });
 
@@ -561,7 +605,12 @@ describe('changePassword flow', () => {
     if (!result.ok) return;
     expect(result.data.message).toMatch(/updated/i);
     expect(reauthArgs).toEqual({ email: EMAIL, password: CURRENT });
-    expect(updateArgs).toEqual({ password: NEW_STRONG });
+    // updateUser precedes the revocation, and the revocation targets other
+    // devices only (scope: 'others') so this session survives.
+    expect(calls).toEqual([
+      { fn: 'updateUser', args: { password: NEW_STRONG } },
+      { fn: 'signOut', args: { scope: 'others' } },
+    ]);
   });
 
   it('rejects a wrong current password with a generic error and never calls updateUser', async () => {

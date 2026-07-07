@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 // Integration harness for `packages/auth` flows. Mirrors the pattern from
 // `packages/db/test/rls/setup.ts`:
@@ -92,6 +92,56 @@ export async function createAuthUser(opts: {
 
 export async function deleteAuthUserById(id: string): Promise<void> {
   await serviceSql`delete from auth.users where id = ${id}`;
+}
+
+export async function deleteAuthUserByEmail(email: string): Promise<void> {
+  await serviceSql`delete from auth.users where email = ${email}`;
+}
+
+/**
+ * Service-role Supabase client. The one legitimate place outside the worker
+ * services (docs/architecture/03-auth.md) — here only to mint real one-time
+ * tokens via the admin API so `verifyEmailToken` can be exercised against a
+ * genuine Supabase-issued `token_hash` rather than a fake.
+ */
+export function serviceClient(): SupabaseClient {
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false, storage: memoryStorage() },
+  });
+}
+
+/**
+ * Mint a real Supabase one-time email token and return its `token_hash` — the
+ * exact value the send-email hook would embed in a confirm link. Uses the
+ * admin `generateLink` API so the integration tests can drive the real
+ * `verifyOtp` path (consume-once, expiry) instead of a structural fake.
+ *
+ * `signup` provisions an unconfirmed User (needs a password); `recovery` and
+ * `email_change` act on an existing User.
+ */
+export async function generateEmailOtp(
+  admin: SupabaseClient,
+  opts:
+    | { type: 'signup'; email: string; password: string }
+    | { type: 'recovery' | 'magiclink'; email: string }
+    | { type: 'email_change_new'; email: string; newEmail: string },
+): Promise<{ tokenHash: string }> {
+  const params =
+    opts.type === 'signup'
+      ? { type: 'signup' as const, email: opts.email, password: opts.password }
+      : opts.type === 'email_change_new'
+        ? { type: 'email_change_new' as const, email: opts.email, newEmail: opts.newEmail }
+        : { type: opts.type, email: opts.email };
+
+  // supabase-js types the generateLink union tightly; the runtime accepts the
+  // shape above for each branch. Cast at the call boundary only.
+  const { data, error } = await admin.auth.admin.generateLink(
+    params as Parameters<typeof admin.auth.admin.generateLink>[0],
+  );
+  if (error || !data.properties?.hashed_token) {
+    throw new Error(`generateLink(${opts.type}) failed: ${error?.message ?? 'no hashed_token'}`);
+  }
+  return { tokenHash: data.properties.hashed_token };
 }
 
 export async function endServiceSql(): Promise<void> {
