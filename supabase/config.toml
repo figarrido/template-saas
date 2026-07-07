@@ -227,7 +227,13 @@ enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
-max_frequency = "1s"
+# Kept sub-second for the local/CI stack: an unconfirmed sign-in bumps this
+# window, so the immediately-following "resend confirmation" (e2e/signin.spec.ts)
+# would otherwise be rejected with `over_email_send_rate_limit` and deliver no
+# email. Note "0s" is treated as *unset* by GoTrue and falls back to a ~60s
+# default — must be a small positive value. Hosted projects set their own in the
+# Supabase dashboard; this only governs the local/CI stack.
+max_frequency = "100ms"
 # Number of characters used in the email OTP.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
