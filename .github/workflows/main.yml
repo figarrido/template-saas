@@ -69,3 +69,11 @@ jobs:
           NEXT_PUBLIC_SITE_URL: 'http://localhost:3000'
           STRIPE_SECRET_KEY: 'sk_test_placeholder'
           STRIPE_WEBHOOK_SECRET: 'whsec_placeholder'
+          # The auth send_email hook renders + dispatches verification mail here
+          # (the specs read it back from Mailpit). E2E runs a prod build
+          # (`next start` → NODE_ENV=production), so `selectEmailProvider()`
+          # would default to Resend and throw without RESEND_API_KEY. Pin it to
+          # SMTP → the local Mailpit that `supabase start` exposes on :54425.
+          MAIL_PROVIDER: 'smtp'
+          SMTP_HOST: '127.0.0.1'
+          SMTP_PORT: '54425'
