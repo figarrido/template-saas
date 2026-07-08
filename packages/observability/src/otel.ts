@@ -1,6 +1,6 @@
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { Resource } from '@opentelemetry/resources';
+import { resourceFromAttributes } from '@opentelemetry/resources';
 import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
@@ -30,7 +30,7 @@ export function initOtel(options: InitOtelOptions): NodeSDK | undefined {
   if (!exporterUrl) return undefined; // Absent = no-op per docs/architecture/06-observability.md.
 
   sdk = new NodeSDK({
-    resource: new Resource({
+    resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: options.service,
       [ATTR_SERVICE_VERSION]: options.release ?? process.env.RELEASE ?? 'dev',
       'deployment.environment': options.env ?? process.env.NODE_ENV ?? 'development',
