@@ -1663,7 +1663,7 @@
       "name": "membership_role",
       "values": [
         "owner",
-        "admin",
+        "manager",
         "member"
       ],
       "schema": "public"

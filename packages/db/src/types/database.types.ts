@@ -517,7 +517,7 @@ export type Database = {
     Enums: {
       invitation_status: "pending" | "accepted" | "revoked" | "expired"
       invoice_status: "draft" | "open" | "paid" | "void" | "uncollectible"
-      membership_role: "owner" | "admin" | "member"
+      membership_role: "owner" | "manager" | "member"
       tax_document_status: "pending" | "emitted" | "voided" | "failed"
     }
     CompositeTypes: {
@@ -648,7 +648,7 @@ export const Constants = {
     Enums: {
       invitation_status: ["pending", "accepted", "revoked", "expired"],
       invoice_status: ["draft", "open", "paid", "void", "uncollectible"],
-      membership_role: ["owner", "admin", "member"],
+      membership_role: ["owner", "manager", "member"],
       tax_document_status: ["pending", "emitted", "voided", "failed"],
     },
   },

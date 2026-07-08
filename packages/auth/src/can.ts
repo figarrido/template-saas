@@ -3,7 +3,7 @@
 // Derived projects extend this by widening Role / Action and adding rows.
 // docs/architecture/03-auth.md: "Central `can(membership, action)` helper".
 
-export type Role = 'owner' | 'admin' | 'member';
+export type Role = 'owner' | 'manager' | 'member';
 
 export type Action =
   | 'org:read'
@@ -24,15 +24,15 @@ export type Membership = {
 };
 
 const TABLE: Record<Action, ReadonlyArray<Role>> = {
-  'org:read': ['owner', 'admin', 'member'],
-  'org:update': ['owner', 'admin'],
+  'org:read': ['owner', 'manager', 'member'],
+  'org:update': ['owner', 'manager'],
   'org:delete': ['owner'],
-  'member:invite': ['owner', 'admin'],
-  'member:remove': ['owner', 'admin'],
+  'member:invite': ['owner', 'manager'],
+  'member:remove': ['owner', 'manager'],
   'member:change-role': ['owner'],
-  'billing:read': ['owner', 'admin'],
+  'billing:read': ['owner', 'manager'],
   'billing:manage': ['owner'],
-  'invoice:read': ['owner', 'admin'],
+  'invoice:read': ['owner', 'manager'],
   'flag:override': ['owner'],
 };
 

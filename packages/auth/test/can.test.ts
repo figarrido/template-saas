@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { assertCan, can, ForbiddenError, type Membership } from '../src/can.js';
 
 const owner: Membership = { user_id: 'u', organization_id: 'o', role: 'owner' };
-const admin: Membership = { user_id: 'u', organization_id: 'o', role: 'admin' };
+const manager: Membership = { user_id: 'u', organization_id: 'o', role: 'manager' };
 const member: Membership = { user_id: 'u', organization_id: 'o', role: 'member' };
 
 describe('can()', () => {
@@ -12,10 +12,10 @@ describe('can()', () => {
     expect(can(owner, 'flag:override')).toBe(true);
   });
 
-  it('lets admin manage members but not delete org or override flags', () => {
-    expect(can(admin, 'member:invite')).toBe(true);
-    expect(can(admin, 'org:delete')).toBe(false);
-    expect(can(admin, 'flag:override')).toBe(false);
+  it('lets manager manage members but not delete org or override flags', () => {
+    expect(can(manager, 'member:invite')).toBe(true);
+    expect(can(manager, 'org:delete')).toBe(false);
+    expect(can(manager, 'flag:override')).toBe(false);
   });
 
   it('restricts member to read-only org actions', () => {

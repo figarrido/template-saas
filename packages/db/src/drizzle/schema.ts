@@ -9,7 +9,7 @@ export const authUsers = authSchema.table("users", {
 
 export const invitation_status = pgEnum("invitation_status", ['pending', 'accepted', 'revoked', 'expired'])
 export const invoice_status = pgEnum("invoice_status", ['draft', 'open', 'paid', 'void', 'uncollectible'])
-export const membership_role = pgEnum("membership_role", ['owner', 'admin', 'member'])
+export const membership_role = pgEnum("membership_role", ['owner', 'manager', 'member'])
 export const tax_document_status = pgEnum("tax_document_status", ['pending', 'emitted', 'voided', 'failed'])
 
 

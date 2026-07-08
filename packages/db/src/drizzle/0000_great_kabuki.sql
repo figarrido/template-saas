@@ -3,7 +3,7 @@
 /*
 CREATE TYPE "public"."invitation_status" AS ENUM('pending', 'accepted', 'revoked', 'expired');--> statement-breakpoint
 CREATE TYPE "public"."invoice_status" AS ENUM('draft', 'open', 'paid', 'void', 'uncollectible');--> statement-breakpoint
-CREATE TYPE "public"."membership_role" AS ENUM('owner', 'admin', 'member');--> statement-breakpoint
+CREATE TYPE "public"."membership_role" AS ENUM('owner', 'manager', 'member');--> statement-breakpoint
 CREATE TYPE "public"."tax_document_status" AS ENUM('pending', 'emitted', 'voided', 'failed');--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "organizations" (
 	"organization_id" uuid PRIMARY KEY DEFAULT uuid_generate_v7() NOT NULL,
