@@ -10,3 +10,18 @@ allowBuilds:
   protobufjs: true
   sharp: true
   unrs-resolver: true
+# Transitive-only advisory pins. Direct deps (next, drizzle-orm, @opentelemetry/*,
+# vitest, nodemailer) are bumped at their declaration sites, not here. These force
+# patched versions of packages we only pull in transitively and cannot bump
+# directly:
+#   - next    via packages/email > react-email (dev email-preview server)
+#   - glob    via packages/email > react-email (build glob)
+#   - rollup  via apps/admin > @sentry/nextjs build plugin
+#   - vite    via the vitest test runner
+# Revisit on each dependency sweep; drop an entry once the parent stops resolving
+# a vulnerable version.
+overrides:
+  next@<15.5.16: ^15.5.16
+  glob@>=10.2.0 <10.5.0: ^10.5.0
+  rollup@>=3.0.0 <3.30.0: ^3.30.0
+  vite@<6.4.3: ^6.4.3
