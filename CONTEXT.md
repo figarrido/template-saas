@@ -47,6 +47,10 @@ _Avoid_: Workspace, Account, Tenant (as a synonym for Organization)
 The permission level a Member holds within an Organization. Enum: `owner`, `manager`, `member`.
 _Avoid_: Admin (as a role name — use `manager` instead)
 
+**Slug**:
+An Organization's unique, URL-safe handle, doubling as the Organization's path segment in the web app. Derived automatically from the Organization's name at creation; collisions are resolved by suffixing, never by rejecting the name. A reserved-word list exists because some path segments already have other meanings.
+_Avoid_: Handle, Username (for Organizations)
+
 ### Billing
 
 **Charge**:
