@@ -201,6 +201,18 @@ middleware.ts  auth, active-org, CSP nonce, rate-limit
 
 ---
 
+## Code graph
+
+A queryable tree-sitter graph of the codebase (built with [graphify](https://github.com/safishamsi/graphify)) may exist at `graphify-out/graph.json`. Prefer it over broad file reading when locating code:
+
+- `graphify query "<question>"` / `graphify explain "<Symbol>"` / `graphify path "<A>" "<B>"`.
+- Missing? Build it with `pnpm graph` (seconds, incremental; the binary comes from `uv tool install graphifyy==0.9.9`). If the tool isn't installed, fall back to grep — don't install it unasked.
+- Edges are tagged `EXTRACTED` (AST fact) or `INFERRED` (confidence-scored guess) — confirm INFERRED edges by reading the file.
+- The graph answers "what exists / what connects to what"; CLAUDE.md and `docs/` answer "why". `.graphifyignore` deliberately excludes docs/media so builds need no LLM key — don't remove those patterns.
+- `graphify-out/` and `.graphify/` are generated and gitignored. **Never commit them** — a committed graph goes stale on every merge and would hand conflicts to the sandcastle merge phase. Rebuild instead of hand-editing.
+
+---
+
 ## Adding or changing decisions
 
 `docs/architecture/README.md` § Adding or changing a decision:

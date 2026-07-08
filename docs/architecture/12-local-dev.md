@@ -22,6 +22,7 @@
 - **`pnpm dev:webhooks`**: `stripe listen --forward-to localhost:3000/api/webhooks/billing/stripe`. Separate task because it requires a Stripe CLI login.
 - **`pnpm db:reset`**: `supabase db reset` (drops, re-applies migrations, re-seeds).
 - **`pnpm db:types`**: regenerates `database.types.ts` from the live local schema.
+- **`pnpm graph`**: rebuilds the queryable code graph in `graphify-out/` (see [Code graph](#code-graph-graphify) below).
 
 ---
 
@@ -49,6 +50,18 @@
 - **Sentry:** init guarded by `NODE_ENV === 'production'`. No DSN needed locally.
 - **PostHog:** a dev project ID is acceptable; alternatively the client no-ops in dev (`POSTHOG_KEY` absent → no-op).
 - **Stripe:** sandbox keys + `stripe listen` per `pnpm dev:webhooks`.
+
+---
+
+## Code graph (graphify)
+
+**Decision:** [Graphify](https://github.com/safishamsi/graphify) (PyPI package `graphifyy`, pinned in `.sandcastle/Dockerfile`) builds a queryable tree-sitter graph of the codebase. The graph is **derived state**: `graphify-out/` and `.graphify/` are gitignored, and every consumer builds its own from its checkout — devs via `pnpm graph` (binary from `uv tool install graphifyy==0.9.9`; uv is already a prerequisite), each sandcastle sandbox via its `onSandboxReady` hook. The only committed graph-related file is `.graphifyignore`, which keeps the corpus code-only so builds need no LLM API key.
+
+**Why:** agents and humans locate code by querying the graph (`graphify query` / `explain` / `path`) instead of reading files broadly, which cuts exploration cost. Committing the graph was rejected: it goes stale on every merge, and as a large generated JSON it would feed the sandcastle merge phase conflicts that can't be meaningfully resolved. Rebuilding is cheap (seconds, SHA-cached incremental re-runs), so freshness is achieved by rebuilding, never by syncing.
+
+**Tradeoffs:** one more host tool to install for those who want it (the graph is optional on the host — everything works without it); the graph reflects the last build, not the working tree; tree-sitter edges on TypeScript are approximate (tagged `EXTRACTED` vs `INFERRED` with confidence scores).
+
+**Related:** [08-platform](./08-platform.md)
 
 ---
 

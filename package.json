@@ -27,6 +27,7 @@
     "jobs:codegen": "turbo run jobs:codegen",
     "jobs:codegen:check": "turbo run jobs:codegen:check",
     "supabase:promote-pr": "tsx scripts/promote-pr.ts",
+    "graph": "graphify extract .",
     "sandcastle": "tsx .sandcastle/main.mts",
     "changeset": "changeset",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""

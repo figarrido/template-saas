@@ -30,6 +30,20 @@ pnpm dev:webhooks # stripe listen --forward-to ...
 
 See [`docs/architecture/12-local-dev.md`](./docs/architecture/12-local-dev.md) for the full local dev workflow.
 
+## Code graph (optional)
+
+[Graphify](https://github.com/safishamsi/graphify) builds a queryable tree-sitter graph of the codebase. The sandcastle agents use it to find reuse candidates before writing code; it's equally useful for architecture reviews or any AI-assisted session.
+
+```sh
+uv tool install graphifyy==0.9.9   # one-time; installs the `graphify` binary
+pnpm graph                         # build → graphify-out/ (seconds; re-runs are incremental)
+graphify query "what implements billing providers?"
+graphify explain "BillingProvider"
+graphify path "StripeProvider" "Charge"
+```
+
+The graph is **derived state, like `node_modules`**: `graphify-out/` is gitignored and never committed — a committed graph goes stale on every merge and would feed unresolvable conflicts to the sandcastle merge step. Every consumer builds its own from its checkout (you via `pnpm graph`, each sandcastle sandbox via its install hook), so the graph is always in sync with the code it describes. The committed [`.graphifyignore`](./.graphifyignore) keeps the corpus code-only, so building needs no LLM API key.
+
 ## Layout
 
 ```
