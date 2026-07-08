@@ -27,11 +27,15 @@
 // issues are picked up after each round of merges.
 //
 // Usage:
-//   pnpm sandcastle
-// (defined in package.json as "sandcastle": "tsx .sandcastle/main.mts")
+//   pnpm sandcastle                  # defaults: 4 issues per cycle, 10 cycles
+//   pnpm sandcastle --parallel 2     # take only the top 2 issues per cycle
+//   pnpm sandcastle -p 1 -i 1        # one issue, one cycle — slow mode
+// (defined in package.json as "sandcastle": "tsx .sandcastle/main.mts";
+// pnpm forwards flags after the script name straight to the script)
 
 import * as sandcastle from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
+import { parseArgs } from "node:util";
 import { z } from "zod";
 
 // The planner emits its plan as JSON inside <plan> tags; Output.object extracts
@@ -75,16 +79,33 @@ const VERIFY_VERDICTS = {
 // Configuration
 // ---------------------------------------------------------------------------
 
-// Maximum number of plan→execute→merge cycles before stopping.
-// Raise this if your backlog is large; lower it for a quick smoke-test run.
-const MAX_ITERATIONS = 10;
+const { values: flags } = parseArgs({
+  options: {
+    parallel: { type: "string", short: "p" },
+    iterations: { type: "string", short: "i" },
+  },
+});
 
-// Cap on how many issues run concurrently in one cycle. Each issue spins up
-// its own Docker container plus a ~90s clean `pnpm install`, and runs an opus
-// implementer for up to 100 iterations — a wide-open backlog would saturate
-// the machine and the token budget. The planner lists issues highest-priority
-// first, so slicing keeps the most important ones.
-const MAX_PARALLEL = 4;
+function positiveInt(name: string, raw: string | undefined, fallback: number) {
+  if (raw === undefined) return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1) {
+    console.error(`--${name} must be a positive integer, got "${raw}"`);
+    process.exit(1);
+  }
+  return value;
+}
+
+// Maximum number of plan→execute→merge cycles before stopping (--iterations).
+// Raise this if your backlog is large; lower it for a quick smoke-test run.
+const MAX_ITERATIONS = positiveInt("iterations", flags.iterations, 10);
+
+// Cap on how many issues run concurrently in one cycle (--parallel). Each
+// issue spins up its own Docker container plus a ~90s clean `pnpm install`,
+// and runs an opus implementer for up to 100 iterations — a wide-open backlog
+// would saturate the machine and the token budget. The planner lists issues
+// highest-priority first, so slicing keeps the most important ones.
+const MAX_PARALLEL = positiveInt("parallel", flags.parallel, 4);
 
 // Dependency install hook for the EXECUTE/REVIEW phase only.
 //
