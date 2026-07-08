@@ -64,9 +64,9 @@ const planSchema = z.object({
 type PlannedIssue = z.infer<typeof planSchema>["issues"][number];
 
 // What each per-issue pipeline resolves to. The gate in Phase 3 needs all
-// three booleans to be true (plus at least one commit) before a branch is
-// handed to the merger. `note` explains an early exit (architect blocked,
-// NEEDS_ARCHITECT, no commits) so the cycle report can say why.
+// three booleans to be true (and the branch to be ahead of the base) before a
+// branch is handed to the merger. `note` explains an early exit (architect
+// blocked, NEEDS_ARCHITECT, not COMPLETE) so the cycle report can say why.
 type PipelineResult = {
   issue: PlannedIssue;
   commits: { sha: string }[];
@@ -194,6 +194,29 @@ function assertRepoNotMidMerge() {
       "(usually `git merge --abort`), then re-run.",
   );
   process.exit(1);
+}
+
+// Whether a branch carries any commit the target branch (HEAD) doesn't already
+// have. The merge gate must NOT depend on how many commits the CURRENT
+// implementer run produced: a branch fully finished in a PRIOR cycle resumes
+// with its work already committed, so its implementer re-affirms COMPLETE while
+// adding zero new commits — yet it is still perfectly mergeable. Gating on
+// this-run commits stranded such branches forever (the classic symptom: the
+// same "last issue" is re-selected every cycle, its implementer says COMPLETE,
+// and it's held back with "produced no commits"). Asked of git on the HOST,
+// where the branch ref survives sandbox.close() and where the merge happens.
+function branchIsAheadOfBase(branch: string): boolean {
+  try {
+    const count = execFileSync(
+      "git",
+      ["rev-list", "--count", `HEAD..${branch}`],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    ).trim();
+    return Number(count) > 0;
+  } catch {
+    // Branch ref missing (never created, or pruned) — nothing to merge.
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -338,12 +361,20 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
         const implementComplete =
           implement.completionSignal === IMPLEMENT_SIGNALS.complete;
 
-        if (!implementComplete || implement.commits.length === 0) {
-          // The gate requires COMPLETE plus commits, so this branch cannot
-          // merge this cycle no matter what a reviewer says — skip the opus
-          // review and the verifier. The implementer prompt guarantees an
-          // issue comment exists (progress notes or the NEEDS_ARCHITECT
-          // report) for the next cycle to pick up.
+        if (!implementComplete) {
+          // Not COMPLETE (NEEDS_ARCHITECT, or the implementer exhausted its
+          // iteration budget without signaling) — there is no finished work to
+          // review, so skip the opus reviewer and the verifier. The implementer
+          // prompt guarantees an issue comment exists (progress notes or the
+          // NEEDS_ARCHITECT report) for the next cycle to pick up.
+          //
+          // We deliberately do NOT also bail on `implement.commits.length === 0`
+          // here. A branch fully finished in a PRIOR cycle but held back for a
+          // transient reason resumes with its work already committed, so this
+          // run signals COMPLETE with zero NEW commits. The reviewer and
+          // verifier must still run against the branch's existing commits; the
+          // merge gate below decides mergeability from branchIsAheadOfBase, not
+          // from this run's commit count.
           return {
             issue,
             commits: implement.commits,
@@ -353,9 +384,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
             note:
               implement.completionSignal === IMPLEMENT_SIGNALS.needsArchitect
                 ? "implementer requested a revised design (NEEDS_ARCHITECT)"
-                : implement.commits.length === 0
-                  ? "implementer produced no commits"
-                  : "implementer did not signal COMPLETE",
+                : "implementer did not signal COMPLETE (e.g. exhausted its iteration budget)",
           };
         }
 
@@ -432,7 +461,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // -------------------------------------------------------------------------
   const mergeable = results.filter(
     (r) =>
-      r.commits.length > 0 &&
+      branchIsAheadOfBase(r.issue.branch) &&
       r.implementComplete &&
       r.reviewApproved &&
       r.checksPassed,
@@ -454,8 +483,9 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       ]
         .filter(Boolean)
         .join("; ");
-    const suffix =
-      r.commits.length > 0 ? " — branch kept for the next cycle" : "";
+    const suffix = branchIsAheadOfBase(r.issue.branch)
+      ? " — branch kept for the next cycle"
+      : "";
     console.log(`  ⏸ ${r.issue.branch} held back (${reasons})${suffix}`);
   }
 

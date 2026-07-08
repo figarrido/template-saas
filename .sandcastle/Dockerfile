@@ -58,6 +58,17 @@ ENV COREPACK_HOME=/home/agent/.cache/corepack
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN mkdir -p /home/agent/.cache/corepack
 
+# Turborepo writes its local cache to `.turbo/cache` in the repo root by
+# default. In the bind-mounted worktree that path can be owned by another user
+# (host UID vs. the agent UID), so turbo dies with "failed to create directory
+# `.turbo/cache` → Permission denied (os error 13)" — which silently sank the
+# read-only verifier (it can't apply the TURBO_CACHE_DIR override the
+# implementer improvised, so it reported FAIL on a green branch). Point the
+# cache at the agent's home (always agent-owned, outside the mount) so every
+# phase — implementer, reviewer, and verifier — can run pnpm typecheck/test.
+ENV TURBO_CACHE_DIR=/home/agent/.turbo-cache
+RUN mkdir -p /home/agent/.turbo-cache
+
 WORKDIR /home/agent
 
 # In worktree sandbox mode, Sandcastle bind-mounts the git worktree at /home/agent/workspace
