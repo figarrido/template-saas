@@ -8,6 +8,16 @@ export const serviceSql = postgres(
   { max: 4, prepare: false },
 );
 
+// Sentinel that forces a ROLLBACK. postgres's `sql.begin` COMMITS when its
+// callback resolves and only rolls back when it throws — so to keep every
+// asUser call side-effect-free we always throw this once `fn` has resolved,
+// then recover fn's value from it. Without this a write that RLS *permits*
+// (e.g. the create_organization RPC) would commit and leak into a sibling
+// test file running in parallel against the same database.
+class Rollback<T> {
+  constructor(readonly value: T) {}
+}
+
 /**
  * Runs `fn` inside a transaction with the connection acting as the given
  * authenticated user — the same posture as `apps/web` going through
@@ -21,14 +31,24 @@ export async function asUser<T>(
   userId: string,
   fn: (sql: ReturnType<typeof postgres>) => Promise<T>,
 ): Promise<T> {
-  return serviceSql.begin(async (tx) => {
-    await tx`set local role authenticated`;
-    await tx`select set_config('request.jwt.claims', ${JSON.stringify({
-      sub: userId,
-      role: 'authenticated',
-    })}, true)`;
-    return fn(tx as unknown as ReturnType<typeof postgres>);
-  }) as Promise<T>;
+  try {
+    await serviceSql.begin(async (tx) => {
+      await tx`set local role authenticated`;
+      await tx`select set_config('request.jwt.claims', ${JSON.stringify({
+        sub: userId,
+        role: 'authenticated',
+      })}, true)`;
+      const value = await fn(tx as unknown as ReturnType<typeof postgres>);
+      // Resolve → force rollback, carrying the value out via the sentinel.
+      throw new Rollback(value);
+    });
+    // Unreachable: the callback always throws (Rollback on success, or fn's
+    // own error, which we let propagate below).
+    throw new Error('asUser: transaction unexpectedly committed');
+  } catch (err) {
+    if (err instanceof Rollback) return err.value as T;
+    throw err;
+  }
 }
 
 // Seeded fixture IDs (see supabase/seed.sql).
