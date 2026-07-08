@@ -187,7 +187,7 @@ DB branching is deferred per [constraints/budget](../constraints/budget.md); a d
 ### Security advisories
 
 - GitHub Dependabot security alerts stay enabled (separate from version bumps).
-- `pnpm audit` runs in CI on `main` weekly; high-severity findings open an issue automatically.
+- `pnpm audit` runs in CI on `main` weekly; high-severity findings are tracked on a single rolling issue (labeled `security` + `needs-triage`), refreshed each run rather than re-filed.
 
 ### Lockfile policy
 
