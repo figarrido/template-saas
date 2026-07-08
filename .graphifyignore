@@ -1,0 +1,25 @@
+# Keep the graphify corpus code-only. Doc/media files (per graphify's
+# detect.py: .md .mdx .qmd .txt .rst .html .yaml .yml, PDFs, images, video)
+# are extracted with an LLM, which needs an API key the sandcastle sandboxes
+# don't have — and the docs are already agent-navigable via CLAUDE.md.
+# The graph exists to answer code-structure questions.
+*.md
+*.mdx
+*.qmd
+*.txt
+*.rst
+*.html
+*.yaml
+*.yml
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.svg
+*.mp4
+*.mov
+*.webm
+*.mp3
+*.wav

@@ -56,6 +56,12 @@ supabase/.env
 .tsbuildinfo
 *.tsbuildinfo
 
+# Graphify — per-sandbox generated code graph (see .sandcastle/main.mts).
+# Never commit: rebuilt per worktree; committing it would hand merge
+# conflicts to the merge agent, which is forbidden from resolving them.
+graphify-out/
+.graphify/
+
 # Changesets
 .changeset/*-changelog.md
 
