@@ -25,3 +25,14 @@ export async function getMyOrgRefs(): Promise<OrgRef[]> {
   const memberships = await getMyOrganizations();
   return memberships.flatMap((m) => (m.organizations ? [{ slug: m.organizations.slug }] : []));
 }
+
+export type OrgSummary = { slug: string; name: string };
+
+// Name+slug view of the current User's Organizations, shared by the org
+// picker and the dashboard org switcher.
+export async function getMyOrgSummaries(): Promise<OrgSummary[]> {
+  const memberships = await getMyOrganizations();
+  return memberships.flatMap((m) =>
+    m.organizations ? [{ slug: m.organizations.slug, name: m.organizations.name }] : [],
+  );
+}

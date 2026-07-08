@@ -15,7 +15,7 @@ import { createOrganizationAction } from '@/lib/actions/org';
 
 type Values = z.infer<typeof createOrganizationSchema>;
 
-export function FirstOrgForm() {
+export function CreateOrganizationForm() {
   const form = useZodForm(createOrganizationSchema);
   const submitting = form.formState.isSubmitting;
 

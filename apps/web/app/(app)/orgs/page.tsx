@@ -1,16 +1,11 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@template/ui';
-import { getMyOrganizations } from '@/lib/data/org';
+import { getMyOrgSummaries } from '@/lib/data/org';
 
 // Organization picker — shown to Users who are members of 2+ Organizations.
 // docs/architecture/03-auth.md § First-login routing.
 export default async function OrgPickerPage() {
-  const memberships = await getMyOrganizations();
-  const orgs = memberships
-    .map((m) =>
-      m.organizations ? { slug: m.organizations.slug, name: m.organizations.name } : null,
-    )
-    .filter((x): x is { slug: string; name: string } => x !== null);
+  const orgs = await getMyOrgSummaries();
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center p-6">
@@ -28,6 +23,12 @@ export default async function OrgPickerPage() {
               {org.name}
             </Link>
           ))}
+          <Link
+            href="/orgs/new"
+            className="rounded-md border border-dashed p-3 text-center hover:bg-accent"
+          >
+            New organization
+          </Link>
         </CardContent>
       </Card>
     </main>
