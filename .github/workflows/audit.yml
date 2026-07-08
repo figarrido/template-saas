@@ -6,8 +6,8 @@ on:
   workflow_dispatch: {}
 
 # docs/architecture/08-platform.md § Dependency hygiene:
-# "`pnpm audit` runs in CI on main weekly; high-severity findings open an
-# issue automatically."
+# "`pnpm audit` runs in CI on main weekly; high-severity findings are tracked
+# on a single rolling issue (security + needs-triage), refreshed each run."
 
 permissions:
   contents: read
@@ -40,14 +40,44 @@ jobs:
       - if: steps.audit.outputs.status != '0'
         uses: actions/github-script@v7
         with:
+          # Maintain a single rolling issue rather than opening a new one each
+          # run. We identify it by a hidden marker in the body (label-scoped
+          # search), refresh its findings, and add a comment. A fresh issue is
+          # only created when no open rolling issue exists.
           script: |
             const fs = require('fs');
-            const findings = fs.existsSync('findings.txt') ? fs.readFileSync('findings.txt', 'utf8') : '(no findings.txt)';
-            const title = `High-severity dependency advisory — ${new Date().toISOString().slice(0,10)}`;
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title,
-              body: `Weekly \`pnpm audit\` reported high-severity advisories.\n\n${findings}\n\nWorkflow: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              labels: ['security']
+            const { owner, repo } = context.repo;
+            const marker = '<!-- pnpm-audit-report -->';
+            const today = new Date().toISOString().slice(0, 10);
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const findings = fs.existsSync('findings.txt')
+              ? fs.readFileSync('findings.txt', 'utf8')
+              : '(no findings.txt)';
+            const body = [
+              marker,
+              `Weekly \`pnpm audit --audit-level=high\` reported high-severity advisories. Last updated **${today}**.`,
+              '',
+              findings,
+              '',
+              `Workflow: ${runUrl}`,
+            ].join('\n');
+
+            const open = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', labels: 'security', per_page: 100,
             });
+            const rolling = open.find((i) => !i.pull_request && (i.body || '').includes(marker));
+
+            if (rolling) {
+              await github.rest.issues.update({ owner, repo, issue_number: rolling.number, body });
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: rolling.number,
+                body: `Re-checked ${today}: high-severity advisories still present. Refreshed the list above.\n\nWorkflow: ${runUrl}`,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner, repo,
+                title: 'High-severity dependency advisories',
+                body,
+                labels: ['security', 'needs-triage'],
+              });
+            }
