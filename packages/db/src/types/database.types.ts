@@ -510,6 +510,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_organization: {
+        Args: { org_name: string }
+        Returns: {
+          created_at: string
+          name: string
+          organization_id: string
+          slug: string
+          updated_at: string
+        }
+      }
       is_member_of: { Args: { target_org: string }; Returns: boolean }
       is_org_admin: { Args: { target_org: string }; Returns: boolean }
       uuid_generate_v7: { Args: never; Returns: string }

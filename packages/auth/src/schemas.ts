@@ -69,6 +69,16 @@ export const changeEmailSchema = z.object({
   newEmail: emailSchema,
 });
 
+// Org creation: one field, a name. Bounds mirror the create_organization RPC
+// (2–50 chars on the trimmed value) so client, Server Action, and DB agree.
+export const createOrganizationSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, 'Organization name must be at least 2 characters.')
+    .max(50, 'Organization name must be at most 50 characters.'),
+});
+
 export type SignInInput = z.infer<typeof signInSchema>;
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;
@@ -76,3 +86,4 @@ export type RequestPasswordResetInput = z.infer<typeof requestPasswordResetSchem
 export type UpdatePasswordInput = z.infer<typeof updatePasswordSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type ChangeEmailInput = z.infer<typeof changeEmailSchema>;
+export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>;

@@ -28,6 +28,7 @@ export {
   updatePasswordSchema,
   changePasswordSchema,
   changeEmailSchema,
+  createOrganizationSchema,
   type SignInInput,
   type SignUpInput,
   type ResendVerificationInput,
@@ -35,6 +36,7 @@ export {
   type UpdatePasswordInput,
   type ChangePasswordInput,
   type ChangeEmailInput,
+  type CreateOrganizationInput,
 } from './schemas.js';
 export {
   signIn,
@@ -52,6 +54,7 @@ export {
   isEmailOtpType,
   EMAIL_OTP_TYPES,
   AUTH_MESSAGES,
+  invalidInputFirstIssue,
   type SignInResult,
   type SignOutResult,
   type SignUpResult,

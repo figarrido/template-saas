@@ -29,4 +29,5 @@ export {
 export { exchangeOAuthCode, type ExchangeOAuthCodeResult } from './exchange-oauth-code.js';
 export { destinationForOrganizations, type Destination, type OrgRef } from './routing.js';
 export { AUTH_MESSAGES } from './messages.js';
+export { invalidInputFirstIssue } from './errors.js';
 export type { ActionResult, ActionErrorCode, AuthClient } from './types.js';

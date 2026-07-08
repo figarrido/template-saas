@@ -120,6 +120,16 @@
 - **Active org state:** `active_organization_id` cookie. Middleware in `apps/web` validates the cookie against memberships on every request; mismatch → org picker. RLS still keys on `auth.uid()` + `memberships` (cookie is UI scope, not a security boundary).
 - **Org switcher** in the top nav updates the cookie + soft-reload.
 
+### Organization creation & slug derivation
+
+**Decision:** Organizations are created only through the `create_organization` `SECURITY DEFINER` RPC (authenticated-only; execute revoked from anon/public), which inserts the Organization and the creator's `owner` Membership in one transaction. The URL Slug is derived in SQL: lowercase-kebab of the name, 2–50 char bounds, reserved app-path-segment remapping and collision resolution by suffixing — atomic with the `unique(slug)` constraint. Creation never rejects a name for slug reasons. No per-user cap on Organizations; IP rate-limiting (middleware) is the only throttle — per-user caps are derived-project policy.
+
+**Why:** One write door keeps the `organizations` insert-blocking RLS policy absolute and makes org+owner atomicity a DB invariant, not app discipline. Slug logic in one place (SQL) means no client/server drift and no name ever fails for reasons the User can't see (Slug is invisible to them). Atomic suffix-on-`unique_violation` is race-safe under concurrent creates.
+
+**Tradeoffs:** Slug logic in PL/pgSQL is less ergonomic to unit-test than TypeScript, but it has exactly one home and is covered by the RLS suite through real DB behavior. No-cap keeps onboarding frictionless; abuse is bounded by rate limits and is a derived-project concern.
+
+**Related:** [02-data](./02-data.md), [09-api-boundary](./09-api-boundary.md)
+
 ### Authorization helper (`packages/auth`)
 
 - `can(membership, action)` — central lookup table mapping (role, action) → allow/deny.
