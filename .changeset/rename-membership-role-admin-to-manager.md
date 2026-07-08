@@ -1,6 +1,6 @@
 ---
-"@repo/auth": patch
-"@repo/db": patch
+'@template/auth': patch
+'@template/db': patch
 ---
 
 Rename membership role `admin` → `manager` per ADR 0001.
