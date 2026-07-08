@@ -1,12 +1,20 @@
 # TASK
 
-Fix issue {{TASK_ID}}: {{ISSUE_TITLE}}
+Implement issue {{TASK_ID}}: {{ISSUE_TITLE}}
 
-Pull in the issue and its discussion using `gh issue view {{TASK_ID}} --comments`. If it has a parent PRD, pull that in too. Comments may contain progress notes or review feedback from a previous cycle — treat unresolved feedback as part of the task.
+Pull in the issue and its discussion using `gh issue view {{TASK_ID}} --comments`.
+
+An architect has already designed this change: the newest issue comment starting with `<!-- sandcastle:design -->` is your specification. Follow it exactly — the files it names, the code it says to reuse, the tests it asks for, the scope it draws. Do not redesign, do not substitute your own approach, and do not build from scratch anything the design says to reuse.
+
+Comments may also contain progress notes or review feedback from a previous cycle — treat unresolved feedback as part of the task.
 
 Only work on the issue specified.
 
-Work on branch {{BRANCH}}. This branch may already contain partial work from a previous cycle: check `git log {{TARGET_BRANCH}}..HEAD --oneline` first, and if there are commits, continue from where they left off instead of starting over.
+# BRANCH
+
+Work on branch {{BRANCH}}. It may already contain partial work from a previous cycle: check `git log {{TARGET_BRANCH}}..HEAD --oneline` first, and if there are commits, continue from where they left off instead of starting over.
+
+Then sync with the target branch: if `git log HEAD..{{TARGET_BRANCH}} --oneline` shows commits, run `git merge {{TARGET_BRANCH}} --no-edit`, resolve any conflicts, and confirm `pnpm typecheck` passes on the merge result before continuing. A finished branch that sits on a stale base gets stuck at the merge phase — sync early, while you can still run the tests.
 
 # CONTEXT
 
@@ -20,11 +28,9 @@ Here are the last 10 commits:
 
 # EXPLORATION
 
-Explore the repo and fill your context window with relevant information that will allow you to complete the task.
+Read the files the design names — and their existing tests — before changing them. CLAUDE.md and docs/architecture/ are the source of truth for conventions.
 
-CLAUDE.md and docs/architecture/ are the source of truth for conventions — follow them.
-
-Pay extra attention to test files that touch the relevant parts of the code.
+If you need to locate something the design didn't name, a code graph is available: `graphify query "<question>"` or `graphify explain "<Symbol>"` (fall back to grep if it's missing).
 
 # EXECUTION
 
@@ -74,7 +80,9 @@ Output <promise>COMPLETE</promise> ONLY when all of the following are true:
 - `pnpm typecheck` and `pnpm test` pass
 - All work is committed
 
-If any of those are false, end WITHOUT the promise tag — the loop will run you again and you can continue.
+Output <promise>NEEDS_ARCHITECT</promise> when the design cannot be executed as written — it names code that doesn't exist, its approach cannot pass the tests, or the issue's acceptance criteria aren't covered by it. Do NOT improvise a redesign. Instead: commit any safe partial work, comment on the issue describing exactly where the design breaks down (quote the design section and the reality that contradicts it), then emit the signal so the architect revises the design next cycle.
+
+If neither applies — the work is simply unfinished — end WITHOUT any signal; the loop will run you again and you can continue.
 
 # FINAL RULES
 

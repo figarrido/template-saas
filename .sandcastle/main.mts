@@ -1,27 +1,39 @@
-// Parallel Planner with Review — four-phase orchestration loop
+// Parallel Planner with Review — multi-phase orchestration loop
 //
 // This template drives a multi-phase workflow:
 //   Phase 1 (Plan):             An opus agent analyzes open issues, builds a
 //                               dependency graph, and outputs a <plan> JSON
 //                               listing unblocked issues with branch names.
-//   Phase 2 (Execute + Review): For each issue, a sandbox is created via
-//                               createSandbox(). The implementer runs first
-//                               (100 iterations). If it produces commits, a
-//                               reviewer runs in the same sandbox on the same
-//                               branch and emits an APPROVE/REQUEST_CHANGES
-//                               verdict, then a cheap verifier agent re-runs
-//                               typecheck + tests and emits PASS/FAIL. All
-//                               issue pipelines run concurrently via
-//                               Promise.allSettled().
+//   Phase 2 (Design + Execute + Review):
+//                               For each issue, a sandbox is created via
+//                               createSandbox(). An opus architect explores
+//                               the code (via the graphify code graph built in
+//                               the sandbox hook) and posts a design to the
+//                               issue; a sonnet implementer executes that
+//                               design (up to 100 iterations), with a
+//                               NEEDS_ARCHITECT escape signal for when the
+//                               design collides with reality. If it commits
+//                               and signals COMPLETE, an opus reviewer emits
+//                               an APPROVE/REQUEST_CHANGES verdict, then a
+//                               cheap verifier re-runs typecheck + tests and
+//                               emits PASS/FAIL. All issue pipelines run
+//                               concurrently via Promise.allSettled().
 //   Phase 3 (Gate):             A branch is mergeable only if the implementer
 //                               signaled COMPLETE, the reviewer approved, and
 //                               the verifier passed. Anything else is held
 //                               back — the branch survives on disk and the
 //                               next cycle resumes it (branch names are
 //                               deterministic per issue).
-//   Phase 4 (Merge):            A single agent merges all mergeable branches
-//                               into the current branch and closes their
-//                               issues.
+//   Phase 4 (Merge):            The orchestrator itself merges each mergeable
+//                               branch into the current branch — a script, not
+//                               an agent: merging and issue-closing are
+//                               deterministic, and conflicted branches are
+//                               skipped rather than resolved (the next cycle's
+//                               implementer resolves them in-branch, where the
+//                               test suite runs). The merged result is then
+//                               verified on the HOST; a red merged base stops
+//                               the loop. Merges stay local — pushing is left
+//                               to the human on purpose.
 //
 // The outer loop repeats up to MAX_ITERATIONS times so that newly unblocked
 // issues are picked up after each round of merges.
@@ -35,6 +47,7 @@
 
 import * as sandcastle from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
+import { execFileSync, execSync } from "node:child_process";
 import { parseArgs } from "node:util";
 import { z } from "zod";
 
@@ -52,13 +65,15 @@ type PlannedIssue = z.infer<typeof planSchema>["issues"][number];
 
 // What each per-issue pipeline resolves to. The gate in Phase 3 needs all
 // three booleans to be true (plus at least one commit) before a branch is
-// handed to the merger.
+// handed to the merger. `note` explains an early exit (architect blocked,
+// NEEDS_ARCHITECT, no commits) so the cycle report can say why.
 type PipelineResult = {
   issue: PlannedIssue;
   commits: { sha: string }[];
   implementComplete: boolean;
   reviewApproved: boolean;
   checksPassed: boolean;
+  note?: string;
 };
 
 // Verdict signals for the reviewer and verifier. sandbox.run() has no
@@ -73,6 +88,23 @@ const REVIEW_VERDICTS = {
 const VERIFY_VERDICTS = {
   pass: "<verdict>PASS</verdict>",
   fail: "<verdict>FAIL</verdict>",
+} as const;
+
+// The architect either posts an executable design to the issue (READY) or
+// declares the issue undesignable (BLOCKED — it comments and swaps the
+// ready-for-agent label for needs-info so the planner stops selecting it).
+const ARCHITECT_VERDICTS = {
+  ready: "<design>READY</design>",
+  blocked: "<design>BLOCKED</design>",
+} as const;
+
+// The implementer's two exits: COMPLETE (acceptance criteria met, checks
+// green, work committed) or NEEDS_ARCHITECT (the design collided with
+// reality — punt back to the architect next cycle instead of letting the
+// cheaper model improvise a redesign).
+const IMPLEMENT_SIGNALS = {
+  complete: "<promise>COMPLETE</promise>",
+  needsArchitect: "<promise>NEEDS_ARCHITECT</promise>",
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -123,7 +155,20 @@ const MAX_PARALLEL = positiveInt("parallel", flags.parallel, 4);
 // issues to build a plan; it needs no dependencies, so it gets no install hook.
 const installHooks = {
   sandbox: {
-    onSandboxReady: [{ command: "pnpm install", timeoutMs: 300_000 }],
+    onSandboxReady: [
+      { command: "pnpm install", timeoutMs: 300_000 },
+      // Build the tree-sitter code graph the architect queries. Token-free:
+      // .graphifyignore keeps the corpus code-only, so no LLM key is needed,
+      // and graphify-out/ is gitignored so it never reaches the merger.
+      // Tolerant on purpose (|| echo): a failed graph build must not kill the
+      // pipeline — the architect prompt falls back to manual exploration when
+      // graph.json is missing.
+      {
+        command:
+          "bash -c 'graphify extract . || echo \"graphify build failed - architect will explore manually\"'",
+        timeoutMs: 300_000,
+      },
+    ],
   },
 };
 
@@ -131,12 +176,34 @@ const installHooks = {
 // The host is macOS and the sandbox is Linux; copying macOS-built binaries in
 // only forces pnpm to purge and rebuild them. A clean install is correct here.
 
+// A crash during a previous run's merge phase can leave the MAIN repo
+// mid-merge (MERGE_HEAD + conflict markers in the working tree). The planner
+// and merger bind-mount that repo directly, so running on top of that state
+// is undefined behavior — stop and let the human decide (usually
+// `git merge --abort`). Checked at the top of every cycle, not just at boot,
+// because the merger runs at the end of each one.
+function assertRepoNotMidMerge() {
+  try {
+    execSync("git rev-parse -q --verify MERGE_HEAD", { stdio: "ignore" });
+  } catch {
+    return; // MERGE_HEAD doesn't resolve — no merge in progress.
+  }
+  console.error(
+    "The repository is mid-merge (MERGE_HEAD exists) — likely a previous " +
+      "run died during the merge phase. Inspect the state and resolve it " +
+      "(usually `git merge --abort`), then re-run.",
+  );
+  process.exit(1);
+}
+
 // ---------------------------------------------------------------------------
 // Main loop
 // ---------------------------------------------------------------------------
 
 for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   console.log(`\n=== Iteration ${iteration}/${MAX_ITERATIONS} ===\n`);
+
+  assertRepoNotMidMerge();
 
   // -------------------------------------------------------------------------
   // Phase 1: Plan
@@ -211,32 +278,84 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       });
 
       try {
-        // Run the implementer
+        // The architect (opus) explores for reuse — code graph first — and
+        // posts an executable design as an issue comment. On resumed branches
+        // whose design is still valid it re-affirms cheaply instead of
+        // re-designing. The design comment persists across cycles, so a
+        // held-back branch never loses its design context.
+        const architect = await sandbox.run({
+          name: "architect",
+          maxIterations: 3,
+          agent: sandcastle.claudeCode("claude-opus-4-8"),
+          promptFile: "./.sandcastle/architect-prompt.md",
+          promptArgs: {
+            TASK_ID: issue.id,
+            ISSUE_TITLE: issue.title,
+            BRANCH: issue.branch,
+          },
+          completionSignal: [
+            ARCHITECT_VERDICTS.ready,
+            ARCHITECT_VERDICTS.blocked,
+          ],
+        });
+
+        if (architect.completionSignal !== ARCHITECT_VERDICTS.ready) {
+          // BLOCKED (the architect commented and re-labeled the issue) or no
+          // verdict at all — either way there is no design to implement.
+          return {
+            issue,
+            commits: [],
+            implementComplete: false,
+            reviewApproved: false,
+            checksPassed: false,
+            note:
+              architect.completionSignal === ARCHITECT_VERDICTS.blocked
+                ? "architect blocked the issue — needs human input (see issue comment)"
+                : "architect produced no design",
+          };
+        }
+
+        // The implementer (sonnet — the design carries the hard thinking, so
+        // the executor can be a cheaper model) executes the architect's
+        // design. NEEDS_ARCHITECT is its escape hatch for designs that don't
+        // survive contact with the code.
         const implement = await sandbox.run({
           name: "implementer",
           maxIterations: 100,
-          agent: sandcastle.claudeCode("claude-opus-4-8"),
+          agent: sandcastle.claudeCode("claude-sonnet-4-6"),
           promptFile: "./.sandcastle/implement-prompt.md",
           promptArgs: {
             TASK_ID: issue.id,
             ISSUE_TITLE: issue.title,
             BRANCH: issue.branch,
           },
+          completionSignal: [
+            IMPLEMENT_SIGNALS.complete,
+            IMPLEMENT_SIGNALS.needsArchitect,
+          ],
         });
 
-        // The implementer only emits <promise>COMPLETE</promise> (the default
-        // completion signal) when acceptance criteria are met and tests pass.
-        // No signal after 100 iterations means the work is partial.
-        const implementComplete = implement.completionSignal !== undefined;
+        const implementComplete =
+          implement.completionSignal === IMPLEMENT_SIGNALS.complete;
 
-        if (implement.commits.length === 0) {
-          // Nothing to review, verify, or merge.
+        if (!implementComplete || implement.commits.length === 0) {
+          // The gate requires COMPLETE plus commits, so this branch cannot
+          // merge this cycle no matter what a reviewer says — skip the opus
+          // review and the verifier. The implementer prompt guarantees an
+          // issue comment exists (progress notes or the NEEDS_ARCHITECT
+          // report) for the next cycle to pick up.
           return {
             issue,
-            commits: [],
+            commits: implement.commits,
             implementComplete,
             reviewApproved: false,
             checksPassed: false,
+            note:
+              implement.completionSignal === IMPLEMENT_SIGNALS.needsArchitect
+                ? "implementer requested a revised design (NEEDS_ARCHITECT)"
+                : implement.commits.length === 0
+                  ? "implementer produced no commits"
+                  : "implementer did not signal COMPLETE",
           };
         }
 
@@ -267,6 +386,10 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
           maxIterations: 1,
           agent: sandcastle.claudeCode("claude-haiku-4-5-20251001"),
           promptFile: "./.sandcastle/verify-prompt.md",
+          // TASK_ID lets the verifier leave a failure summary on the issue —
+          // otherwise a verify-FAIL after an APPROVE holds the branch back
+          // with no written trace for the next cycle to act on.
+          promptArgs: { TASK_ID: issue.id },
           completionSignal: [VERIFY_VERDICTS.pass, VERIFY_VERDICTS.fail],
         });
 
@@ -315,21 +438,25 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       r.checksPassed,
   );
 
-  const heldBack = results.filter(
-    (r) => r.commits.length > 0 && !mergeable.includes(r),
-  );
+  // Everything that didn't pass the gate gets reported — including pipelines
+  // that produced no commits at all (an implementer that burned its iteration
+  // budget without committing, or an architect that blocked the issue) so no
+  // stuck issue goes unnoticed in the cycle summary.
+  const heldBack = results.filter((r) => !mergeable.includes(r));
 
   for (const r of heldBack) {
-    const reasons = [
-      !r.implementComplete && "implementer did not signal COMPLETE",
-      !r.reviewApproved && "reviewer did not approve",
-      !r.checksPassed && "typecheck/tests did not pass",
-    ]
-      .filter(Boolean)
-      .join("; ");
-    console.log(
-      `  ⏸ ${r.issue.branch} held back (${reasons}) — branch kept for the next cycle`,
-    );
+    const reasons =
+      r.note ??
+      [
+        !r.implementComplete && "implementer did not signal COMPLETE",
+        !r.reviewApproved && "reviewer did not approve",
+        !r.checksPassed && "typecheck/tests did not pass",
+      ]
+        .filter(Boolean)
+        .join("; ");
+    const suffix =
+      r.commits.length > 0 ? " — branch kept for the next cycle" : "";
+    console.log(`  ⏸ ${r.issue.branch} held back (${reasons})${suffix}`);
   }
 
   console.log(
@@ -349,36 +476,104 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // -------------------------------------------------------------------------
   // Phase 4: Merge
   //
-  // One agent merges all mergeable branches into the current branch and
-  // closes their issues. Conflict resolution happens here; anything too
-  // entangled gets skipped and reported rather than guessed at.
+  // No agent here — merging is deterministic, so the orchestrator does it
+  // directly on the host (git needs no node_modules, and gh is authenticated
+  // on the host). Each branch's issue is closed immediately after its merge:
+  // merge and close are a pair, and as code the ordering is guaranteed, not a
+  // prompt instruction a model might reorder.
   //
-  // The {{BRANCHES}} and {{ISSUES}} prompt arguments are lists that the agent
-  // uses to know which branches to merge and which issues to close.
+  // Conflicted branches are skipped, NOT resolved. The next cycle's
+  // implementer merges the target branch into them in-branch (see
+  // implement-prompt.md), where the test suite can actually validate the
+  // resolution — a strictly better place than here, where it can't run.
+  //
+  // execFileSync (no shell) throughout: branch names and issue ids originate
+  // from planner model output and must never reach a shell.
   // -------------------------------------------------------------------------
-  await sandcastle.run({
-    // Like the planner, the merger runs via sandcastle.run, which bind-mounts the
-    // MAIN repo read-write — so no install hook (it would purge/rebuild the host
-    // node_modules on macOS). The merge itself (git) needs no dependencies.
-    // On a macOS host the merger can't run the suite (Linux container, macOS
-    // node_modules), which is why verification happens per-branch in Phase 2
-    // and the merge prompt forbids touching node_modules entirely.
-    sandbox: docker(),
-    name: "merger",
-    maxIterations: 1,
-    agent: sandcastle.claudeCode("claude-opus-4-8"),
-    promptFile: "./.sandcastle/merge-prompt.md",
-    promptArgs: {
-      // A markdown list of branch names, one per line.
-      BRANCHES: mergeable.map((r) => `- ${r.issue.branch}`).join("\n"),
-      // A markdown list of issue IDs and titles, one per line.
-      ISSUES: mergeable
-        .map((r) => `- ${r.issue.id}: ${r.issue.title}`)
-        .join("\n"),
-    },
-  });
+  const merged: PlannedIssue[] = [];
+  const skipped: PlannedIssue[] = [];
 
-  console.log("\nBranches merged.");
+  console.log("");
+  for (const { issue } of mergeable) {
+    try {
+      execFileSync("git", ["merge", issue.branch, "--no-edit"], {
+        stdio: "pipe",
+        encoding: "utf8",
+      });
+    } catch (error) {
+      // Restore a clean tree and hold the branch for the next cycle.
+      try {
+        execFileSync("git", ["merge", "--abort"], { stdio: "pipe" });
+      } catch {
+        // No merge in progress to abort (e.g. the ref didn't exist at all).
+      }
+      const stdout = (error as { stdout?: string }).stdout ?? "";
+      const conflicts = stdout
+        .split("\n")
+        .filter((line) => line.startsWith("CONFLICT"))
+        .slice(0, 3);
+      skipped.push(issue);
+      console.log(
+        `  ✗ ${issue.branch} skipped — merge did not apply cleanly` +
+          (conflicts.length > 0 ? `\n      ${conflicts.join("\n      ")}` : ""),
+      );
+      continue;
+    }
+
+    merged.push(issue);
+    console.log(`  ✓ ${issue.branch} merged`);
+
+    try {
+      execFileSync(
+        "gh",
+        ["issue", "close", issue.id, "--comment", "Completed by Sandcastle"],
+        { stdio: "pipe" },
+      );
+    } catch {
+      // The merge landed but the close didn't. This is the one state that
+      // cannot self-heal: the planner would re-select a fully merged issue
+      // forever (nothing left to commit, so it can never pass the gate).
+      // Make it loud and tell the human the exact fix.
+      console.error(
+        `  ⚠ ${issue.branch} merged but issue #${issue.id} could NOT be ` +
+          `closed — close it manually: gh issue close ${issue.id}`,
+      );
+    }
+  }
+
+  console.log(
+    `\nMerge phase done: ${merged.length} merged, ${skipped.length} skipped` +
+      `${skipped.length > 0 ? " (held for the next cycle)" : ""}.`,
+  );
+
+  if (merged.length === 0) {
+    // Nothing landed on the target branch, so there is nothing new to verify.
+    continue;
+  }
+
+  console.log("\nVerifying the merged result on the host...");
+
+  // Each branch was verified green in isolation, but two independently green
+  // branches can still break each other, and the merger can't run the suite
+  // (Linux container, macOS node_modules). Verify here on the host — the one
+  // place with a working toolchain — and stop rather than let a broken base
+  // feed the next cycle's branches. `pnpm install` first: merged branches may
+  // have changed the lockfile. (Merges stay local; pushing is the human's
+  // call.)
+  try {
+    execSync("pnpm install && pnpm typecheck && pnpm test", {
+      stdio: "inherit",
+    });
+  } catch {
+    console.error(
+      "\nMerged result fails checks on the host. Stopping so the next cycle " +
+        "doesn't build on a broken base — inspect the merge, fix or revert, " +
+        "then re-run.",
+    );
+    process.exit(1);
+  }
+
+  console.log("\nMerged result verified.");
 }
 
 console.log("\nAll done.");

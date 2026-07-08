@@ -41,6 +41,16 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 # Add Claude to PATH
 ENV PATH="/home/agent/.local/bin:$PATH"
 
+# Graphify (installed via uv): the per-issue sandbox hook builds a tree-sitter
+# code graph (graphify-out/) that the architect agent queries to find reuse
+# candidates without reading the whole repo. The PyPI package is "graphifyy"
+# (double y) while the maintainer reclaims the "graphify" name; the binary it
+# installs is `graphify`. Pinned exactly: the project is pre-1.0 and moving
+# fast. uv uses the system python3 (bookworm ships 3.11, satisfying >=3.10)
+# or downloads a managed one.
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
+  && uv tool install graphifyy==0.9.9
+
 # corepack's cache must be writable by the agent user (see note above). Point it
 # at the agent's home and pre-create it; disable the interactive download prompt
 # so the first `pnpm` invocation fetches the pinned version non-interactively.
