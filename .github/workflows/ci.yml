@@ -16,7 +16,7 @@ concurrency:
 env:
   NODE_VERSION: 22
   # Keep in sync with the `supabase` version in package.json.
-  SUPABASE_VERSION: 2.107.0
+  SUPABASE_VERSION: 2.109.1
 
 jobs:
   lint:
