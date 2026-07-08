@@ -519,6 +519,12 @@ export type Database = {
           slug: string
           updated_at: string
         }
+        SetofOptions: {
+          from: "*"
+          to: "organizations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       is_member_of: { Args: { target_org: string }; Returns: boolean }
       is_org_admin: { Args: { target_org: string }; Returns: boolean }
