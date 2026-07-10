@@ -1,12 +1,44 @@
 # template-saas
 
-A SaaS template. See [`docs/architecture/`](./docs/architecture/) for every decision and [`CLAUDE.md`](./CLAUDE.md) for working notes.
+A production-shaped, opinionated **SaaS template** — multi-tenant from day one, RLS enforced structurally, billing that separates charging from tax-document emission, and background jobs on Postgres. Fork it, delete what you don't need, and ship.
 
-## What this is
+[![CI](https://github.com/figarrido/template-saas/actions/workflows/ci.yml/badge.svg)](https://github.com/figarrido/template-saas/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-App_Router-black?logo=next.js)](https://nextjs.org)
+[![Supabase](https://img.shields.io/badge/Supabase-Postgres_%2B_RLS-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
-Next.js (App Router) + Supabase + Tailwind + Vercel + Railway. Two apps (`apps/web`, `apps/admin`), two workers (`services/worker-node`, `services/worker-py`), shared packages under `packages/*`. RLS is structural, not by convention.
+> This is a **template**, not a product. Country-, jurisdiction-, and product-specific adapters live in derived projects against the template's interfaces — not here. Every concrete vendor shipped is weight every derived project carries, so the template ships **abstractions plus one reference implementation**, no more.
 
-This is a **template**, not a product. Country/jurisdiction/product-specific adapters live in derived projects against the template's interfaces — not here.
+Every architectural decision is written down in [`docs/architecture/`](./docs/architecture/); [`CLAUDE.md`](./CLAUDE.md) is the working-notes orientation for AI-assisted sessions.
+
+## Table of contents
+
+- [Highlights](#highlights)
+- [Stack](#stack)
+- [Quick start](#quick-start)
+- [Code graph](#code-graph)
+- [Repository layout](#repository-layout)
+- [Documentation](#documentation)
+- [License](#license)
+
+## Highlights
+
+- **Structural multi-tenancy.** RLS is enforced by the client factory, not by convention. `apps/web` uses `getUserClient(req)` (RLS-honoring); only `apps/admin` and workers use `getServiceClient()`. ESLint forbids the service-role client in client-facing code — cross-org access has to go through an RPC or a job.
+- **Multi-org from day one.** `profiles`, `memberships`, `invitations`, and an active-org cookie ship out of the box, with `owner` / `manager` / `member` roles behind a single `can(membership, action)` helper.
+- **Provider-agnostic billing.** Charging and tax-document emission are separate concerns behind `BillingProvider` and `EmitterProvider` interfaces. Stripe is the only charging reference; plans and entitlements live in the DB.
+- **Background jobs on Postgres.** pgmq + pg_cron under a typed `defineJob` / `runWorker` wrapper, with a Node worker and a Python worker whose schemas are generated from the same Zod definitions.
+- **Entitlements ≠ flags.** Paid access (billing-derived, mistoggle = legal issue) is kept cleanly separate from rollout flags (OpenFeature + PostHog, mistoggle = UX bug).
+- **Observability baked in.** Sentry, PostHog, and OpenTelemetry trace context propagated across HTTP and through the job queue, with structured JSON logging (Pino + structlog).
+- **Type-safe config.** Per-surface Zod env schemas with boot-time validation; `.env.example` is generated, never hand-edited.
+- **Forward-only migrations.** Raw SQL under `supabase/migrations/`, expand → dual-read → backfill → contract → drop, validated against local Supabase on every PR.
+- **Isolated admin surface.** `apps/admin` is a separate Vercel project with stricter CSP, an audit log on every mutation, and 404-not-403 enforcement.
+
+## Stack
+
+**Next.js (App Router) + Supabase + Tailwind + Vercel + Railway**, a TypeScript monorepo managed with pnpm and turbo.
+
+Two Next.js apps — `apps/web` (client-facing) and `apps/admin` (internal) — deploy as separate Vercel projects and never import each other; they share code through `packages/*`. Two worker services run on Railway: `services/worker-node` (TypeScript) and `services/worker-py` (Python, `uv`).
 
 ## Quick start
 
@@ -30,7 +62,7 @@ pnpm dev:webhooks # stripe listen --forward-to ...
 
 See [`docs/architecture/12-local-dev.md`](./docs/architecture/12-local-dev.md) for the full local dev workflow.
 
-## Code graph (optional)
+## Code graph
 
 [Graphify](https://github.com/safishamsi/graphify) builds a queryable tree-sitter graph of the codebase. The sandcastle agents use it to find reuse candidates before writing code; it's equally useful for architecture reviews or any AI-assisted session.
 
@@ -44,7 +76,7 @@ graphify path "StripeProvider" "Charge"
 
 The graph is **derived state, like `node_modules`**: `graphify-out/` is gitignored and never committed — a committed graph goes stale on every merge and would feed unresolvable conflicts to the sandcastle merge step. Every consumer builds its own from its checkout (you via `pnpm graph`, each sandcastle sandbox via its install hook), so the graph is always in sync with the code it describes. The committed [`.graphifyignore`](./.graphifyignore) keeps the corpus code-only, so building needs no LLM API key.
 
-## Layout
+## Repository layout
 
 ```
 apps/web        apps/admin
@@ -62,7 +94,7 @@ packages/
   flags         OpenFeature client + PostHog provider
 ```
 
-## Docs
+## Documentation
 
 | File | Covers |
 |------|--------|
@@ -78,3 +110,9 @@ packages/
 | [`docs/architecture/10-feature-flags.md`](./docs/architecture/10-feature-flags.md) | OpenFeature + PostHog; entitlements separation |
 | [`docs/architecture/11-config.md`](./docs/architecture/11-config.md) | `packages/config`; TS strictness |
 | [`docs/architecture/12-local-dev.md`](./docs/architecture/12-local-dev.md) | Local dev workflow |
+
+Architectural decision records live in [`docs/adr/`](./docs/adr/); scope and non-goals are in [`docs/architecture/README.md`](./docs/architecture/README.md) and [`docs/constraints/`](./docs/constraints/).
+
+## License
+
+[MIT](./LICENSE) © 2026
