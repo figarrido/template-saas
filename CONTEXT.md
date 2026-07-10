@@ -24,6 +24,11 @@ _Avoid_: Admin User, Staff, Super Admin
 
 **Invitation**:
 A pending offer for a person (possibly not yet a User) to become a Member of an Organization. Has a signed token, expiry, and target role. Progresses to a Membership on acceptance.
+_Avoid_: Operator Invitation (a different entity — see below); do not shorten either to a bare "invite" in domain language.
+
+**Operator Invitation**:
+A pending, email-addressed offer for a person to become an Operator. Unlike an Invitation, it is **not** tied to any Organization and grants no Membership — it grants backoffice access (an `admin_users` row). It is issued by an existing Operator (Operator-to-Operator), never by a Member. On acceptance it provisions a User for that email if none exists yet, then records the grant; if a User already exists for the email, it only records the grant. This invitation-gated provisioning is why `apps/admin` needs no open sign-up.
+_Avoid_: Admin invite, Staff invite, Invitation (when the operator variant is meant).
 
 **Session**:
 A User's authenticated state on one device, backed by a short-lived Supabase access token plus a rotating refresh token, stored in cookies. Sign-out is per-device by default; a password reset revokes the User's Sessions on all *other* devices.
@@ -72,11 +77,15 @@ Provider/adapter-internal vocabulary only. "Customer" is the billing provider's 
 An Organization's ongoing commitment to a Plan, managed by a `BillingProvider`. Has a lifecycle: active, past_due, canceled, etc.
 
 **Plan**:
-A tier of access defined in the DB (e.g., Free, Pro, Enterprise). Provider price IDs map to a Plan, not the reverse. One Plan can have price mappings across multiple billing providers.
+A tier of access defined in the DB (e.g., Free, Pro, Enterprise). Provider price IDs map to a Plan, not the reverse. One Plan can have price mappings across multiple billing providers. A Plan's *contents* — which feature keys it grants — are defined by the `plan_entitlements` mapping; both billing renewals and Operator Comps expand a Plan into Entitlement periods through that mapping.
 
 **Entitlement**:
-A granted right to access a specific feature, derived from an Organization's active Subscription and Plan. Authoritative; a mistoggled Entitlement is a legal or contractual issue.
-_Avoid_: Feature flag, permission (when referring to billing-derived access)
+A time-bounded record that an Organization holds a specific feature (`key`) for one validity period (`starts_at` → `expires_at`). The `entitlements` table is an **append-only ledger** — one row per period, not a current-state table: a Subscription renewal *appends* a new period, cancellation simply stops appending, and rows are never overwritten (the sole permitted mutation is closing a period early via `expires_at = now()`). Because history is preserved, "which feature did this Organization hold, when, from what `source`, and granted by whom (`granted_by`)" is always answerable. An Organization "has" a feature when an active period covers `now()`; overlapping periods from different sources (billing vs [[Comp]]) coexist, and on a value conflict the Comp (`source='grant'`) wins. Authoritative — a mistoggled Entitlement is a legal or contractual issue.
+_Avoid_: Feature flag, permission (for billing/grant-derived access); do not treat the table as current-state (it is a period ledger).
+
+**Comp**:
+An Entitlement period granted by an Operator rather than derived from a paid Subscription (`source='grant'`, `granted_by` = the Operator). Enables a Plan for an Organization *outside* billing — e.g. an offline/wire payment not connected to the provider, or a promotional free period. Time-bounded via `expires_at`; it never auto-renews — extending it is a fresh Operator action, and pulling it early is the "close a period" mutation.
+_Avoid_: Discount, Coupon (billing-provider concepts), Manual entitlement, Grant (bare — reserve for the `source` value).
 
 ### Adapters
 
