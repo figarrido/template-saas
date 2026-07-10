@@ -17,7 +17,7 @@ Listed so future glossaries land in consistent places. A candidate becomes a *re
 
 ## ADRs
 
-- Root [`docs/adr/`](./docs/adr/) holds **system-wide** decisions (current: `0001`–`0005`).
+- Root [`docs/adr/`](./docs/adr/) holds **system-wide** decisions (current: `0001`–`0007`).
 - When a context gets its own `CONTEXT.md`, context-specific decisions live in a `docs/adr/` beside it (e.g. `apps/web/docs/adr/`).
 
 ## Relationships
