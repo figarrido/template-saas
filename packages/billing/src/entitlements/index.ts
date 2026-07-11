@@ -103,19 +103,6 @@ export function resolveActiveEntitlements(periods: ActivePeriod[]): EntitlementR
 }
 
 /**
- * Read API for entitlements. Reads ONLY. A feature is held only while an
- * active period covers now() (starts_at <= now AND expires_at null-or-future).
- * Temporal comparison runs in SQL via now() so it uses the DB clock and
- * compares timestamptz correctly.
- *
- * Apps build their own per-request memoization on top (Next.js `cache()` in
- * apps/web, request-scoped maps in workers). Keeping the raw API
- * dependency-free lets every surface wrap it the same way.
- *
- * docs/architecture/04-billing.md § Entitlements: packages/flags receives
- * this API by injection, never by direct import.
- */
-/**
  * Grant a Comp: expand the Plan via plan_entitlements into source='grant'
  * ledger period rows. One row per mapped key, all sharing starts_at=now()
  * (column default) and the chosen expiry. Appends only — never clobbers
@@ -208,18 +195,31 @@ export async function listActiveComps(
     }
     if (!existing.keys.includes(r.key)) existing.keys.push(r.key);
     if (r.startsAt < existing.startsAt) existing.startsAt = r.startsAt;
+    // expiresAt: a period with no expiry dominates; otherwise keep the latest.
     if (existing.expiresAt !== null) {
-      existing.expiresAt =
-        r.expiresAt === null
-          ? null
-          : r.expiresAt > existing.expiresAt
-            ? r.expiresAt
-            : existing.expiresAt;
+      if (r.expiresAt === null) {
+        existing.expiresAt = null;
+      } else if (r.expiresAt > existing.expiresAt) {
+        existing.expiresAt = r.expiresAt;
+      }
     }
   }
   return [...byPlan.values()];
 }
 
+/**
+ * Read API for entitlements. Reads ONLY. A feature is held only while an
+ * active period covers now() (starts_at <= now AND expires_at null-or-future).
+ * Temporal comparison runs in SQL via now() so it uses the DB clock and
+ * compares timestamptz correctly.
+ *
+ * Apps build their own per-request memoization on top (Next.js `cache()` in
+ * apps/web, request-scoped maps in workers). Keeping the raw API
+ * dependency-free lets every surface wrap it the same way.
+ *
+ * docs/architecture/04-billing.md § Entitlements: packages/flags receives
+ * this API by injection, never by direct import.
+ */
 export function createEntitlements(db: ServiceClient): EntitlementsApi {
   return {
     async has(organizationId, key) {
