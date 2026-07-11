@@ -11,13 +11,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@template/billing": "workspace:*",
-    "@template/db": "workspace:*",
     "@template/email": "workspace:*",
     "@template/env": "workspace:*",
     "@template/jobs": "workspace:*",
     "@template/observability": "workspace:*",
-    "postgres": "^3.4.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

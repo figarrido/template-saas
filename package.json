@@ -35,7 +35,6 @@
   "devDependencies": {
     "@ai-hero/sandcastle": "^0.12.0",
     "@changesets/cli": "^2.27.0",
-    "@standard-schema/spec": "^1.1.0",
     "@stripe/cli": "1.43.7",
     "portless": "^0.15.1",
     "prettier": "^3.9.5",
