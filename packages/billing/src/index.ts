@@ -21,4 +21,10 @@ export type {
 export type { EmitterProvider, EmitInput } from './emitter.js';
 export { BillingRegistry, type EmitterRoute, type ProviderRoute, type RouteContext } from './registry.js';
 export { StripeProvider, type StripeProviderConfig } from './providers/stripe/index.js';
-export { createEntitlements, type EntitlementsApi, type EntitlementRow, type EntitlementValue } from './entitlements/index.js';
+export {
+  createEntitlements,
+  resolveActiveEntitlements,
+  type EntitlementsApi,
+  type EntitlementRow,
+  type EntitlementValue,
+} from './entitlements/index.js';

@@ -40,10 +40,11 @@ beforeAll(async () => {
     values (${OUTSIDER_USER_ID}, ${OUTSIDER_ORG_ID}, 'owner')
     on conflict (user_id, organization_id) do nothing
   `;
+  const outsiderEntId = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
   await serviceSql`
-    insert into public.entitlements (organization_id, key, value, source)
-    values (${OUTSIDER_ORG_ID}, 'pro', 'true'::jsonb, 'seed')
-    on conflict (organization_id, key) do nothing
+    insert into public.entitlements (entitlement_id, organization_id, key, value, source)
+    values (${outsiderEntId}, ${OUTSIDER_ORG_ID}, 'pro', 'true'::jsonb, 'seed')
+    on conflict (entitlement_id) do nothing
   `;
 });
 
@@ -136,6 +137,24 @@ describe('RLS — admin tables are invisible to client', () => {
   it('admin_audit_log is empty via client connection', async () => {
     const rows = await asUser(SEED.regularUserId, (tx) =>
       tx`select admin_audit_log_id from public.admin_audit_log`,
+    );
+    expect(rows.length).toBe(0);
+  });
+});
+
+describe('RLS — plan_entitlements', () => {
+  it('plan_entitlements is empty to a regular user (service-role-only table)', async () => {
+    // RLS enabled + no policy → authenticated role sees 0 rows.
+    // Same posture as admin_users / admin_recovery_codes (ADR 0007).
+    const rows = await asUser(SEED.regularUserId, (tx) =>
+      tx`select plan_id from public.plan_entitlements`,
+    );
+    expect(rows.length).toBe(0);
+  });
+
+  it('plan_entitlements is empty even to a seeded admin via client connection', async () => {
+    const rows = await asUser(SEED.adminUserId, (tx) =>
+      tx`select plan_id from public.plan_entitlements`,
     );
     expect(rows.length).toBe(0);
   });

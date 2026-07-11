@@ -139,10 +139,12 @@ export type Database = {
           entitlement_id: string
           expires_at: string | null
           granted_at: string
-          key: string
+          granted_by: string | null
+          key: Database["public"]["Enums"]["entitlement_key"]
           organization_id: string
           plan_id: string | null
           source: string
+          starts_at: string
           updated_at: string
           value: Json
         }
@@ -151,10 +153,12 @@ export type Database = {
           entitlement_id?: string
           expires_at?: string | null
           granted_at?: string
-          key: string
+          granted_by?: string | null
+          key: Database["public"]["Enums"]["entitlement_key"]
           organization_id: string
           plan_id?: string | null
           source?: string
+          starts_at?: string
           updated_at?: string
           value?: Json
         }
@@ -163,10 +167,12 @@ export type Database = {
           entitlement_id?: string
           expires_at?: string | null
           granted_at?: string
-          key?: string
+          granted_by?: string | null
+          key?: Database["public"]["Enums"]["entitlement_key"]
           organization_id?: string
           plan_id?: string | null
           source?: string
+          starts_at?: string
           updated_at?: string
           value?: Json
         }
@@ -179,6 +185,40 @@ export type Database = {
           },
           {
             foreignKeyName: "entitlements_plan_id_fkey"
+            columns: ["plan_id"]
+            referencedRelation: "plans"
+            referencedColumns: ["plan_id"]
+          },
+        ]
+      }
+      plan_entitlements: {
+        Row: {
+          created_at: string
+          key: Database["public"]["Enums"]["entitlement_key"]
+          plan_entitlement_id: string
+          plan_id: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          key: Database["public"]["Enums"]["entitlement_key"]
+          plan_entitlement_id?: string
+          plan_id: string
+          updated_at?: string
+          value?: Json
+        }
+        Update: {
+          created_at?: string
+          key?: Database["public"]["Enums"]["entitlement_key"]
+          plan_entitlement_id?: string
+          plan_id?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_entitlements_plan_id_fkey"
             columns: ["plan_id"]
             referencedRelation: "plans"
             referencedColumns: ["plan_id"]
@@ -558,6 +598,7 @@ export type Database = {
       uuid_generate_v7: { Args: never; Returns: string }
     }
     Enums: {
+      entitlement_key: "pro"
       invitation_status: "pending" | "accepted" | "revoked" | "expired"
       invoice_status: "draft" | "open" | "paid" | "void" | "uncollectible"
       membership_role: "owner" | "manager" | "member"

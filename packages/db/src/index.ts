@@ -6,3 +6,5 @@ export {
   schema,
 } from './getServiceClient.js';
 export type { Database } from './types/database.types.js';
+export type EntitlementKey =
+  import('./types/database.types.js').Database['public']['Enums']['entitlement_key'];

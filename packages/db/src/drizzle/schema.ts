@@ -7,6 +7,7 @@ export const authUsers = authSchema.table("users", {
 });
 
 
+export const entitlement_key = pgEnum("entitlement_key", ['pro'])
 export const invitation_status = pgEnum("invitation_status", ['pending', 'accepted', 'revoked', 'expired'])
 export const invoice_status = pgEnum("invoice_status", ['draft', 'open', 'paid', 'void', 'uncollectible'])
 export const membership_role = pgEnum("membership_role", ['owner', 'manager', 'member'])
@@ -168,27 +169,34 @@ export const entitlements = pgTable("entitlements", {
 	entitlement_id: uuid().default(sql`uuid_generate_v7()`).primaryKey().notNull(),
 	organization_id: uuid().notNull(),
 	plan_id: uuid(),
-	key: text().notNull(),
+	key: entitlement_key().notNull(),
 	value: jsonb().default(true).notNull(),
 	granted_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	expires_at: timestamp({ withTimezone: true, mode: 'string' }),
 	source: text().default('billing').notNull(),
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	starts_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	granted_by: uuid(),
 }, (table) => {
 	return {
+		entitlements_granted_by_fkey: foreignKey({
+			columns: [table.granted_by],
+			foreignColumns: [authUsers.id],
+			name: "entitlements_granted_by_fkey"
+		}).onDelete("set null"),
 		entitlements_organization_id_fkey: foreignKey({
 			columns: [table.organization_id],
 			foreignColumns: [organizations.organization_id],
 			name: "entitlements_organization_id_fkey"
 		}).onDelete("cascade"),
-		entitlements_organization_id_key_key: unique("entitlements_organization_id_key_key").on(table.organization_id, table.key),
 		entitlements_plan_id_fkey: foreignKey({
 			columns: [table.plan_id],
 			foreignColumns: [plans.plan_id],
 			name: "entitlements_plan_id_fkey"
 		}).onDelete("set null"),
 		entitlements_select: pgPolicy("entitlements_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`is_member_of(organization_id)` }),
+		org_key_expires_idx: index("entitlements_org_key_expires_idx").using("btree", table.organization_id.asc().nullsLast().op("uuid_ops"), table.key.asc().nullsLast().op("enum_ops"), table.expires_at.asc().nullsLast().op("timestamptz_ops")),
 		organization_id_idx: index("entitlements_organization_id_idx").using("btree", table.organization_id.asc().nullsLast().op("uuid_ops")),
 	}
 });
@@ -311,6 +319,24 @@ export const memberships = pgTable("memberships", {
 		memberships_user_id_organization_id_key: unique("memberships_user_id_organization_id_key").on(table.user_id, table.organization_id),
 		organization_id_idx: index("memberships_organization_id_idx").using("btree", table.organization_id.asc().nullsLast().op("uuid_ops")),
 		user_id_idx: index("memberships_user_id_idx").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")),
+	}
+});
+
+export const plan_entitlements = pgTable("plan_entitlements", {
+	plan_entitlement_id: uuid().default(sql`uuid_generate_v7()`).primaryKey().notNull(),
+	plan_id: uuid().notNull(),
+	key: entitlement_key().notNull(),
+	value: jsonb().default(true).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => {
+	return {
+		plan_entitlements_plan_id_fkey: foreignKey({
+			columns: [table.plan_id],
+			foreignColumns: [plans.plan_id],
+			name: "plan_entitlements_plan_id_fkey"
+		}).onDelete("cascade"),
+		plan_entitlements_plan_id_key_key: unique("plan_entitlements_plan_id_key_key").on(table.plan_id, table.key),
 	}
 });
 

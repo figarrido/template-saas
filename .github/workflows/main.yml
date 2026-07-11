@@ -43,6 +43,16 @@ jobs:
       - run: pnpm db:types:check
       - run: pnpm db:introspect:check
       - run: pnpm -F @template/db test:rls
+      - name: Export Supabase keys for integration tests
+        run: |
+          eval "$(pnpm exec supabase status -o env)"
+          echo "SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY" >> $GITHUB_ENV
+          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY" >> $GITHUB_ENV
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
+          echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
+          echo "WORKER_DATABASE_URL=$DB_URL" >> $GITHUB_ENV
+      - run: pnpm -F @template/auth test:integration
+      - run: pnpm -F @template/billing test:integration
       - run: pnpm build
         env:
           # Supply local-dev Supabase defaults so apps/admin env validation

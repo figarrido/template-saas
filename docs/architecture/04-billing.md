@@ -56,11 +56,12 @@
 **Decision:** Lives in `packages/billing` as a sub-export — `import { entitlements } from '@template/billing/entitlements'`.
 
 **Signature:**
-- `entitlements.has(orgId: string, key: string): Promise<boolean>`
-- `entitlements.list(orgId: string): Promise<Entitlement[]>`
+- `entitlements.has(orgId: string, key: EntitlementKey): Promise<boolean>`
+- `entitlements.list(orgId: string): Promise<EntitlementRow[]>`
 - Per-request memoization via Next.js `cache()` wrapper on the server. Workers call directly without the cache wrapper.
 
 **Why:**
+- Storage is an **append-only temporal ledger** (one immutable row per validity period), not a single-row-per-key projection — see [ADR 0007](../adr/0007-entitlements-temporal-ledger.md). A feature is held only while an active period covers `now()`; billing- and grant-sourced periods coexist, and on a value conflict the grant wins. Keys are a closed Postgres `entitlement_key` enum, surfaced in code as the `EntitlementKey` union from `@template/db`.
 - Entitlements are derived from billing state (plans, active subscriptions, manual grants). The source data lives in billing-adjacent tables; a separate `packages/entitlements` would either circular-import or be a thin wrapper.
 - Not attached to the Org model: that would pull billing into `packages/db` and expand `packages/db`'s purpose beyond DB access.
 - Sub-export (rather than top-level on `packages/billing`) keeps the entitlements API discoverable as its own concept while preserving the package boundary.

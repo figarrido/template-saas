@@ -119,3 +119,4 @@ jobs:
           echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "WORKER_DATABASE_URL=$DB_URL" >> $GITHUB_ENV
       - run: pnpm -F @template/auth test:integration
+      - run: pnpm -F @template/billing test:integration

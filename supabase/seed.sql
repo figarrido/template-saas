@@ -110,7 +110,16 @@ insert into public.entitlements (
   'true'::jsonb,
   'seed'
 )
-on conflict (organization_id, key) do nothing;
+on conflict (entitlement_id) do nothing;
+
+-- Map the Pro plan to its entitlement key(s). plan_entitlements is
+-- developer-defined product config (ADR 0007).
+insert into public.plan_entitlements (plan_id, key, value) values (
+  '44444444-4444-4444-4444-444444444444',
+  'pro',
+  'true'::jsonb
+)
+on conflict (plan_id, key) do nothing;
 
 -- One queued job. The Node worker picks this up on first `pnpm dev` so you
 -- can confirm the queue + worker plumbing end-to-end.

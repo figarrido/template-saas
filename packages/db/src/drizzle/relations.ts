@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { admin_audit_log, admin_users, authUsers, billing_accounts, entitlements, flag_overrides, invitations, invoices, memberships, organizations, plans, profiles, tax_documents } from "./schema";
+import { admin_audit_log, admin_users, authUsers, billing_accounts, entitlements, flag_overrides, invitations, invoices, memberships, organizations, plan_entitlements, plans, profiles, tax_documents } from "./schema";
 
 export const admin_audit_logRelations = relations(admin_audit_log, ({one}) => ({
 	authUsers: one(authUsers, {
@@ -30,6 +30,10 @@ export const billing_accountsRelations = relations(billing_accounts, ({one, many
 }));
 
 export const entitlementsRelations = relations(entitlements, ({one}) => ({
+	authUsers: one(authUsers, {
+		fields: [entitlements.granted_by],
+		references: [authUsers.id]
+	}),
 	organization: one(organizations, {
 		fields: [entitlements.organization_id],
 		references: [organizations.organization_id]
@@ -99,8 +103,16 @@ export const organizationsRelations = relations(organizations, ({many}) => ({
 	tax_documents: many(tax_documents),
 }));
 
+export const plan_entitlementsRelations = relations(plan_entitlements, ({one}) => ({
+	plan: one(plans, {
+		fields: [plan_entitlements.plan_id],
+		references: [plans.plan_id]
+	}),
+}));
+
 export const plansRelations = relations(plans, ({many}) => ({
 	entitlements: many(entitlements),
+	plan_entitlements: many(plan_entitlements),
 }));
 
 export const profilesRelations = relations(profiles, ({one, many}) => ({
@@ -132,6 +144,7 @@ export const usersInAuthRelations = relations(authUsers, ({many}) => ({
 	admin_users_user_id: many(admin_users, {
 		relationName: "admin_users_user_id_usersInAuth_id"
 	}),
+	entitlements: many(entitlements),
 	flag_overrides: many(flag_overrides),
 	profiles: many(profiles),
 }));
