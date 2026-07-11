@@ -1,4 +1,8 @@
+@import 'tailwindcss';
 @import '@template/ui/globals.css';
+/* v4 no longer auto-loads tailwind.config.ts; load it for the theme preset
+   (shared design tokens) and the content globs (app + packages/ui/src). */
+@config '../tailwind.config.ts';
 
 /* To swap fonts: change the variable referenced here and update layout.tsx */
 body {
