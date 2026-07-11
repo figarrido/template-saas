@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { authenticator } from 'otplib';
+import { generate } from 'otplib';
 
 // E2E: Operator MFA sign-in flow (ADR 0006). Requires a running local
 // Supabase with the seeded admin@template.test / password operator.
@@ -25,7 +25,7 @@ test.describe('Operator MFA', () => {
     expect(totpSecret).toBeTruthy();
 
     // Submit the TOTP code.
-    const code = authenticator.generate(totpSecret);
+    const code = await generate({ secret: totpSecret });
     await page.fill('input[inputmode="numeric"]', code);
     await page.click('button[type="submit"]');
 
@@ -54,7 +54,7 @@ test.describe('Operator MFA', () => {
 
     await page.waitForURL('**/challenge');
 
-    const code = authenticator.generate(totpSecret);
+    const code = await generate({ secret: totpSecret });
     await page.fill('input[inputmode="numeric"]', code);
     await page.click('button[type="submit"]');
 
@@ -117,7 +117,7 @@ test.describe('Operator MFA', () => {
     await page.click('button[type="submit"]');
     await page.waitForURL('**/challenge');
 
-    const code = authenticator.generate(totpSecret);
+    const code = await generate({ secret: totpSecret });
     await page.fill('input[inputmode="numeric"]', code);
     await page.click('button[type="submit"]');
     await page.waitForURL('**/');

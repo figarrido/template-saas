@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -38,6 +40,15 @@ if (fresh !== committed) {
   console.error(
     'database.types.ts is out of date with the local schema. Run `pnpm db:types`.',
   );
+  // Show what actually differs so failures are diagnosable from the CI log.
+  const freshPath = resolve(tmpdir(), 'database.types.fresh.ts');
+  writeFileSync(freshPath, fresh);
+  try {
+    execFileSync('diff', ['-u', committedPath, freshPath], { stdio: 'inherit' });
+  } catch {
+    // `diff` exits 1 when files differ — expected; the diff is already printed.
+  }
+  rmSync(freshPath, { force: true });
   process.exit(1);
 }
 

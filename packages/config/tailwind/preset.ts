@@ -54,7 +54,7 @@ const preset = {
       },
     },
   },
-  darkMode: ['class'],
+  darkMode: 'class',
 } satisfies Partial<Config>;
 
 export default preset;

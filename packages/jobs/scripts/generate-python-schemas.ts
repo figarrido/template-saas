@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync, readFileSyn
 import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { z } from 'zod';
 import { loadRegistry } from './load-registry.js';
 
 // docs/architecture/05-jobs.md: "Python schemas are generated from TS Zod
@@ -26,7 +26,11 @@ export async function generate(targetDir = outDir): Promise<void> {
     const jobs = registry.list();
 
     for (const job of jobs) {
-      const schema = zodToJsonSchema(job.payload, { name: pascalCase(job.name) });
+      // zod 4 ships JSON Schema generation natively (replaces zod-to-json-schema,
+      // which is typed for zod 3). `title` drives the Pydantic class name that
+      // datamodel-code-generator emits — the same role the old `name` option had.
+      const schema = z.toJSONSchema(job.payload) as Record<string, unknown>;
+      schema.title = pascalCase(job.name);
       writeFileSync(resolve(tmp, `${job.name}.json`), JSON.stringify(schema, null, 2));
     }
 

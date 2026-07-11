@@ -1,9 +1,16 @@
 import { relations } from "drizzle-orm/relations";
-import { admin_audit_log, admin_users, authUsers, billing_accounts, entitlements, flag_overrides, invitations, invoices, memberships, operator_invitations, organizations, plan_entitlements, plans, profiles, tax_documents } from "./schema";
+import { admin_audit_log, admin_recovery_codes, admin_users, authUsers, billing_accounts, entitlements, flag_overrides, invitations, invoices, memberships, operator_invitations, organizations, plan_entitlements, plans, profiles, tax_documents } from "./schema";
 
 export const admin_audit_logRelations = relations(admin_audit_log, ({one}) => ({
 	authUsers: one(authUsers, {
 		fields: [admin_audit_log.actor_user_id],
+		references: [authUsers.id]
+	}),
+}));
+
+export const admin_recovery_codesRelations = relations(admin_recovery_codes, ({one}) => ({
+	authUsers: one(authUsers, {
+		fields: [admin_recovery_codes.user_id],
 		references: [authUsers.id]
 	}),
 }));
@@ -93,6 +100,13 @@ export const membershipsRelations = relations(memberships, ({one}) => ({
 	}),
 }));
 
+export const operator_invitationsRelations = relations(operator_invitations, ({one}) => ({
+	authUsers: one(authUsers, {
+		fields: [operator_invitations.invited_by],
+		references: [authUsers.id]
+	}),
+}));
+
 export const organizationsRelations = relations(organizations, ({many}) => ({
 	billing_accounts: many(billing_accounts),
 	entitlements: many(entitlements),
@@ -101,13 +115,6 @@ export const organizationsRelations = relations(organizations, ({many}) => ({
 	invoices: many(invoices),
 	memberships: many(memberships),
 	tax_documents: many(tax_documents),
-}));
-
-export const operator_invitationsRelations = relations(operator_invitations, ({one}) => ({
-	authUsers: one(authUsers, {
-		fields: [operator_invitations.invited_by],
-		references: [authUsers.id]
-	}),
 }));
 
 export const plan_entitlementsRelations = relations(plan_entitlements, ({one}) => ({
@@ -145,6 +152,7 @@ export const tax_documentsRelations = relations(tax_documents, ({one}) => ({
 
 export const usersInAuthRelations = relations(authUsers, ({many}) => ({
 	admin_audit_logs: many(admin_audit_log),
+	admin_recovery_codes: many(admin_recovery_codes),
 	admin_users_granted_by: many(admin_users, {
 		relationName: "admin_users_granted_by_usersInAuth_id"
 	}),

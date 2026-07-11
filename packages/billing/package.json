@@ -20,14 +20,13 @@
   "dependencies": {
     "@template/db": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "stripe": "^22.2.0",
-    "zod": "^3.23.0"
+    "stripe": "^22.3.1"
   },
   "devDependencies": {
     "@template/config": "workspace:*",
     "@types/node": "^22.0.0",
     "postgres": "^3.4.0",
     "typescript": "^5.6.0",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.10"
   }
 }

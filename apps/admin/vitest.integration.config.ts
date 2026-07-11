@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 // Integration suite. Runs the admin org read API against the local
@@ -11,5 +12,12 @@ export default defineConfig({
     pool: 'forks',
     testTimeout: 30_000,
     hookTimeout: 60_000,
+  },
+  resolve: {
+    alias: {
+      // Admin lib/ modules start with `import 'server-only'`. Next aliases that
+      // at build time; vitest doesn't, so stub it to a no-op here. See stub.
+      'server-only': fileURLToPath(new URL('./test/server-only-stub.ts', import.meta.url)),
+    },
   },
 });

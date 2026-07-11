@@ -191,40 +191,6 @@ export type Database = {
           },
         ]
       }
-      plan_entitlements: {
-        Row: {
-          created_at: string
-          key: Database["public"]["Enums"]["entitlement_key"]
-          plan_entitlement_id: string
-          plan_id: string
-          updated_at: string
-          value: Json
-        }
-        Insert: {
-          created_at?: string
-          key: Database["public"]["Enums"]["entitlement_key"]
-          plan_entitlement_id?: string
-          plan_id: string
-          updated_at?: string
-          value?: Json
-        }
-        Update: {
-          created_at?: string
-          key?: Database["public"]["Enums"]["entitlement_key"]
-          plan_entitlement_id?: string
-          plan_id?: string
-          updated_at?: string
-          value?: Json
-        }
-        Relationships: [
-          {
-            foreignKeyName: "plan_entitlements_plan_id_fkey"
-            columns: ["plan_id"]
-            referencedRelation: "plans"
-            referencedColumns: ["plan_id"]
-          },
-        ]
-      }
       flag_overrides: {
         Row: {
           created_at: string
@@ -276,42 +242,6 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
         ]
-      }
-      operator_invitations: {
-        Row: {
-          accepted_at: string | null
-          created_at: string
-          email: string
-          expires_at: string
-          invited_by: string | null
-          operator_invitation_id: string
-          status: Database["public"]["Enums"]["invitation_status"]
-          token_hash: string
-          updated_at: string
-        }
-        Insert: {
-          accepted_at?: string | null
-          created_at?: string
-          email: string
-          expires_at: string
-          invited_by?: string | null
-          operator_invitation_id?: string
-          status?: Database["public"]["Enums"]["invitation_status"]
-          token_hash: string
-          updated_at?: string
-        }
-        Update: {
-          accepted_at?: string | null
-          created_at?: string
-          email?: string
-          expires_at?: string
-          invited_by?: string | null
-          operator_invitation_id?: string
-          status?: Database["public"]["Enums"]["invitation_status"]
-          token_hash?: string
-          updated_at?: string
-        }
-        Relationships: []
       }
       invitations: {
         Row: {
@@ -472,6 +402,42 @@ export type Database = {
           },
         ]
       }
+      operator_invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          invited_by: string | null
+          operator_invitation_id: string
+          status: Database["public"]["Enums"]["invitation_status"]
+          token_hash: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at: string
+          invited_by?: string | null
+          operator_invitation_id?: string
+          status?: Database["public"]["Enums"]["invitation_status"]
+          token_hash: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          invited_by?: string | null
+          operator_invitation_id?: string
+          status?: Database["public"]["Enums"]["invitation_status"]
+          token_hash?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       organizations: {
         Row: {
           created_at: string
@@ -495,6 +461,40 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      plan_entitlements: {
+        Row: {
+          created_at: string
+          key: Database["public"]["Enums"]["entitlement_key"]
+          plan_entitlement_id: string
+          plan_id: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          key: Database["public"]["Enums"]["entitlement_key"]
+          plan_entitlement_id?: string
+          plan_id: string
+          updated_at?: string
+          value?: Json
+        }
+        Update: {
+          created_at?: string
+          key?: Database["public"]["Enums"]["entitlement_key"]
+          plan_entitlement_id?: string
+          plan_id?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_entitlements_plan_id_fkey"
+            columns: ["plan_id"]
+            referencedRelation: "plans"
+            referencedColumns: ["plan_id"]
+          },
+        ]
       }
       plans: {
         Row: {
@@ -766,6 +766,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      entitlement_key: ["pro"],
       invitation_status: ["pending", "accepted", "revoked", "expired"],
       invoice_status: ["draft", "open", "paid", "void", "uncollectible"],
       membership_role: ["owner", "manager", "member"],

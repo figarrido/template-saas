@@ -10,7 +10,7 @@ export const ENVELOPE_SCHEMA = z.object({
   payload: z.unknown(),
   attempt: z.number().int().nonnegative().default(0),
   enqueuedAt: z.string(),
-  traceparent: z.record(z.string()).optional(),
+  traceparent: z.record(z.string(), z.string()).optional(),
 });
 
 export type JobEnvelope = z.infer<typeof ENVELOPE_SCHEMA>;

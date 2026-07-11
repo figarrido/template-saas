@@ -117,7 +117,10 @@ jobs:
           echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY" >> $GITHUB_ENV
           echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
+          echo "SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "WORKER_DATABASE_URL=$DB_URL" >> $GITHUB_ENV
+          echo "ADMIN_DATABASE_URL=$DB_URL" >> $GITHUB_ENV
+          echo "NEXT_PUBLIC_SITE_URL=http://localhost:3001" >> $GITHUB_ENV
       - run: pnpm -F @template/auth test:integration
       - run: pnpm -F @template/billing test:integration
       - run: pnpm -F @template/admin test:integration

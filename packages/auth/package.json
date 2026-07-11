@@ -18,17 +18,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "zod": "^3.23.0"
+    "zod": "^4.4.3"
   },
   "peerDependencies": {
     "@supabase/supabase-js": "^2.45.0"
   },
   "devDependencies": {
-    "@supabase/supabase-js": "^2.45.0",
+    "@supabase/supabase-js": "^2.110.2",
     "@template/config": "workspace:*",
     "@types/node": "^22.0.0",
     "postgres": "^3.4.0",
     "typescript": "^5.6.0",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.10"
   }
 }

@@ -3,21 +3,29 @@
 import * as React from 'react';
 import { useForm, type FieldValues, type UseFormProps, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import type { ZodSchema, z } from 'zod';
+import type { z } from 'zod';
 import { cn } from '../utils/cn.js';
 import { Label } from '../components/label.js';
 
-export function useZodForm<TSchema extends ZodSchema>(
+// Constrain to schemas whose *output* is a record — zod 4's `z.infer` of an
+// unconstrained generic schema no longer satisfies RHF's `FieldValues`.
+export function useZodForm<TSchema extends z.ZodType<FieldValues>>(
   schema: TSchema,
   options?: Omit<UseFormProps<z.infer<TSchema>>, 'resolver'>,
 ): UseFormReturn<z.infer<TSchema>> {
   return useForm<z.infer<TSchema>>({
     ...options,
-    resolver: zodResolver(schema),
+    // zodResolver v5 ships distinct Zod 3 / Zod 4 overloads that require the
+    // concrete schema type (with `_def.typeName`); the generic `TSchema` erases
+    // it. Field types still come from `useForm<z.infer<TSchema>>`, so cast the
+    // schema at the resolver boundary only.
+    resolver: zodResolver(schema as never),
   });
 }
 
-export type UseZodFormReturn<TSchema extends ZodSchema> = UseFormReturn<z.infer<TSchema>>;
+export type UseZodFormReturn<TSchema extends z.ZodType<FieldValues>> = UseFormReturn<
+  z.infer<TSchema>
+>;
 
 export function Field({
   children,
