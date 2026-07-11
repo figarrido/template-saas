@@ -53,6 +53,7 @@ jobs:
           echo "WORKER_DATABASE_URL=$DB_URL" >> $GITHUB_ENV
       - run: pnpm -F @template/auth test:integration
       - run: pnpm -F @template/billing test:integration
+      - run: pnpm -F @template/admin test:integration
       - run: pnpm build
         env:
           # Supply local-dev Supabase defaults so apps/admin env validation

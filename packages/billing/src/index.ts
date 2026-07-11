@@ -24,7 +24,10 @@ export { StripeProvider, type StripeProviderConfig } from './providers/stripe/in
 export {
   createEntitlements,
   resolveActiveEntitlements,
+  listActiveEntitlementPeriods,
+  entitlementSourceLabel,
   type EntitlementsApi,
   type EntitlementRow,
   type EntitlementValue,
+  type ActiveEntitlementPeriod,
 } from './entitlements/index.js';

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { resolveActiveEntitlements, type EntitlementValue } from '../src/entitlements/index.js';
+import {
+  resolveActiveEntitlements,
+  entitlementSourceLabel,
+  type EntitlementValue,
+} from '../src/entitlements/index.js';
 
 type Period = Parameters<typeof resolveActiveEntitlements>[0][number];
 
@@ -58,5 +62,19 @@ describe('resolveActiveEntitlements', () => {
     const ts = '2027-01-01T00:00:00.000Z';
     const result = resolveActiveEntitlements([billing(true, ts)]);
     expect(result[0]?.expiresAt).toBe(ts);
+  });
+});
+
+describe('entitlementSourceLabel', () => {
+  it("'grant' → 'Comp'", () => {
+    expect(entitlementSourceLabel('grant')).toBe('Comp');
+  });
+
+  it("'billing' → 'Billing'", () => {
+    expect(entitlementSourceLabel('billing')).toBe('Billing');
+  });
+
+  it('unknown source → Other', () => {
+    expect(entitlementSourceLabel('weird')).toBe('Other');
   });
 });

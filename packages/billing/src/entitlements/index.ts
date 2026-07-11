@@ -23,6 +23,53 @@ type ActivePeriod = {
   expiresAt: string | null;
 };
 
+export type ActiveEntitlementPeriod = {
+  key: EntitlementKey;
+  value: EntitlementValue;
+  source: string;
+  startsAt: string;
+  expiresAt: string | null;
+};
+
+/** Operator-facing source label. See docs/architecture/04-billing.md § Entitlements. */
+export function entitlementSourceLabel(source: string): 'Billing' | 'Comp' | 'Other' {
+  if (source === 'grant') return 'Comp';
+  if (source === 'billing') return 'Billing';
+  return 'Other';
+}
+
+function activeWindow(organizationId: string) {
+  return and(
+    eq(schema.entitlements.organization_id, organizationId),
+    lte(schema.entitlements.starts_at, sql`now()`),
+    or(isNull(schema.entitlements.expires_at), gt(schema.entitlements.expires_at, sql`now()`)),
+  );
+}
+
+export async function listActiveEntitlementPeriods(
+  db: ServiceClient,
+  organizationId: string,
+): Promise<ActiveEntitlementPeriod[]> {
+  const rows = await db
+    .select({
+      key: schema.entitlements.key,
+      value: schema.entitlements.value,
+      source: schema.entitlements.source,
+      starts_at: schema.entitlements.starts_at,
+      expires_at: schema.entitlements.expires_at,
+    })
+    .from(schema.entitlements)
+    .where(activeWindow(organizationId))
+    .orderBy(schema.entitlements.key, schema.entitlements.starts_at);
+  return rows.map((r) => ({
+    key: r.key,
+    value: r.value as EntitlementValue,
+    source: r.source,
+    startsAt: r.starts_at,
+    expiresAt: r.expires_at,
+  }));
+}
+
 /**
  * Collapse overlapping active periods to one entry per key. On a value
  * conflict a `grant` (Operator Comp) period wins over a billing period —
@@ -61,13 +108,6 @@ export function resolveActiveEntitlements(periods: ActivePeriod[]): EntitlementR
  * this API by injection, never by direct import.
  */
 export function createEntitlements(db: ServiceClient): EntitlementsApi {
-  const activeWindow = (organizationId: string) =>
-    and(
-      eq(schema.entitlements.organization_id, organizationId),
-      lte(schema.entitlements.starts_at, sql`now()`),
-      or(isNull(schema.entitlements.expires_at), gt(schema.entitlements.expires_at, sql`now()`)),
-    );
-
   return {
     async has(organizationId, key) {
       const rows = await db

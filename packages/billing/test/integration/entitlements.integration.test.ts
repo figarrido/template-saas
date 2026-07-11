@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import postgres from 'postgres';
 import { getServiceClient } from '@template/db';
-import { createEntitlements } from '../../src/entitlements/index.js';
+import { createEntitlements, listActiveEntitlementPeriods } from '../../src/entitlements/index.js';
 
 // Integration suite for the entitlements read API. Runs against the local
 // Supabase stack; gated on `migration-validation` in CI alongside the RLS
@@ -128,6 +128,47 @@ describe('entitlements read API — coexistence and precedence', () => {
     } finally {
       await deleteById(billingId);
       await deleteById(grantId);
+    }
+  });
+});
+
+describe('listActiveEntitlementPeriods', () => {
+  it('single active billing period → one row with correct fields', async () => {
+    const id = await insertPeriod({ source: 'billing', startsAt: serviceSql`now() - interval '1 day'` });
+    try {
+      const periods = await listActiveEntitlementPeriods(db, ORG_ID);
+      expect(periods).toHaveLength(1);
+      expect(periods[0]?.source).toBe('billing');
+      expect(typeof periods[0]?.startsAt).toBe('string');
+      expect(periods[0]?.expiresAt).toBeNull();
+    } finally {
+      await deleteById(id);
+    }
+  });
+
+  it('coexisting billing + grant periods → two rows (no dedupe)', async () => {
+    const billingId = await insertPeriod({ source: 'billing', value: '5' });
+    const grantId = await insertPeriod({ source: 'grant', value: '10' });
+    try {
+      const periods = await listActiveEntitlementPeriods(db, ORG_ID);
+      expect(periods).toHaveLength(2);
+      const sources = new Set(periods.map((p) => p.source));
+      expect(sources).toEqual(new Set(['billing', 'grant']));
+    } finally {
+      await deleteById(billingId);
+      await deleteById(grantId);
+    }
+  });
+
+  it('future-start and expired periods are excluded', async () => {
+    const futureId = await insertPeriod({ startsAt: serviceSql`now() + interval '1 day'` });
+    const expiredId = await insertPeriod({ expiresAt: serviceSql`now() - interval '1 hour'` });
+    try {
+      const periods = await listActiveEntitlementPeriods(db, ORG_ID);
+      expect(periods).toHaveLength(0);
+    } finally {
+      await deleteById(futureId);
+      await deleteById(expiredId);
     }
   });
 });

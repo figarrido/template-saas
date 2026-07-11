@@ -1,4 +1,5 @@
 import 'server-only';
+import { notFound, redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import {
   gateAdmin,
@@ -44,4 +45,15 @@ export async function resolveAdminGate(): Promise<AdminGateResult> {
   }
 
   return gateAdmin(session, { isAdmin, currentLevel, nextLevel, recoveryElevated });
+}
+
+/** Gate guard for Operator pages. Redirects to enroll/challenge or renders 404. */
+export async function requireOperator(): Promise<string> {
+  const gate = await resolveAdminGate();
+  if (!gate.ok) {
+    if (gate.reason === 'enroll') redirect('/enroll');
+    if (gate.reason === 'challenge') redirect('/challenge');
+    notFound();
+  }
+  return gate.userId;
 }
