@@ -20,19 +20,19 @@ export type SurfaceSchema = {
 function isOptional(schema: ZodTypeAny): boolean {
   if (schema instanceof ZodOptional || schema instanceof ZodDefault) return true;
   if (schema instanceof ZodUnion) {
-    return schema._def.options.some(
-      (opt: ZodTypeAny) => opt instanceof ZodOptional || opt instanceof ZodDefault,
+    return schema.options.some(
+      (opt) => opt instanceof ZodOptional || opt instanceof ZodDefault,
     );
   }
   return false;
 }
 
 function defaultExample(schema: ZodTypeAny): string {
-  const inner =
-    schema instanceof ZodOptional || schema instanceof ZodDefault
-      ? schema._def.innerType
-      : schema;
-  if (inner instanceof ZodEnum) return inner._def.values[0] ?? '';
+  // `.unwrap()` returns zod 4's internal `$ZodType`; cast back to the classic type.
+  const inner = (
+    schema instanceof ZodOptional || schema instanceof ZodDefault ? schema.unwrap() : schema
+  ) as ZodTypeAny;
+  if (inner instanceof ZodEnum) return String(inner.options[0] ?? '');
   if (inner instanceof ZodNumber) return '0';
   if (inner instanceof ZodBoolean) return 'false';
   if (inner instanceof ZodString) return '';

@@ -102,8 +102,8 @@ importers:
         specifier: ^18.3.0
         version: 18.3.1(react@18.3.1)
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: ^1.61.1
@@ -205,8 +205,8 @@ importers:
         specifier: ^18.3.0
         version: 18.3.1(react@18.3.1)
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@playwright/test':
         specifier: ^1.61.1
@@ -242,8 +242,8 @@ importers:
   packages/auth:
     dependencies:
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@supabase/supabase-js':
         specifier: ^2.110.2
@@ -276,8 +276,8 @@ importers:
         specifier: ^22.3.1
         version: 22.3.1(@types/node@22.19.21)
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@template/config':
         specifier: workspace:*
@@ -419,13 +419,13 @@ importers:
     dependencies:
       '@t3-oss/env-core':
         specifier: ^0.13.11
-        version: 0.13.11(typescript@5.9.3)(zod@3.25.76)
+        version: 0.13.11(typescript@5.9.3)(zod@4.4.3)
       '@t3-oss/env-nextjs':
         specifier: ^0.13.11
-        version: 0.13.11(typescript@5.9.3)(zod@3.25.76)
+        version: 0.13.11(typescript@5.9.3)(zod@4.4.3)
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@template/config':
         specifier: workspace:*
@@ -477,11 +477,8 @@ importers:
         specifier: ^3.4.0
         version: 3.4.9
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
-      zod-to-json-schema:
-        specifier: ^3.23.0
-        version: 3.25.2(zod@3.25.76)
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@template/config':
         specifier: workspace:*
@@ -590,8 +587,8 @@ importers:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@3.4.19(tsx@4.23.0)(yaml@2.9.0))
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@template/config':
         specifier: workspace:*
@@ -648,8 +645,8 @@ importers:
         specifier: ^3.4.0
         version: 3.4.9
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@template/config':
         specifier: workspace:*
@@ -6860,6 +6857,9 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+
 snapshots:
 
   '@ai-hero/sandcastle@0.12.0':
@@ -9007,17 +9007,17 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@t3-oss/env-core@0.13.11(typescript@5.9.3)(zod@3.25.76)':
+  '@t3-oss/env-core@0.13.11(typescript@5.9.3)(zod@4.4.3)':
     optionalDependencies:
       typescript: 5.9.3
-      zod: 3.25.76
+      zod: 4.4.3
 
-  '@t3-oss/env-nextjs@0.13.11(typescript@5.9.3)(zod@3.25.76)':
+  '@t3-oss/env-nextjs@0.13.11(typescript@5.9.3)(zod@4.4.3)':
     dependencies:
-      '@t3-oss/env-core': 0.13.11(typescript@5.9.3)(zod@3.25.76)
+      '@t3-oss/env-core': 0.13.11(typescript@5.9.3)(zod@4.4.3)
     optionalDependencies:
       typescript: 5.9.3
-      zod: 3.25.76
+      zod: 4.4.3
 
   '@testing-library/dom@10.4.1':
     dependencies:
@@ -13175,3 +13175,5 @@ snapshots:
       zod: 3.25.76
 
   zod@3.25.76: {}
+
+  zod@4.4.3: {}
