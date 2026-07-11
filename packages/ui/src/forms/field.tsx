@@ -13,7 +13,11 @@ export function useZodForm<TSchema extends ZodSchema>(
 ): UseFormReturn<z.infer<TSchema>> {
   return useForm<z.infer<TSchema>>({
     ...options,
-    resolver: zodResolver(schema),
+    // zodResolver v5 ships distinct Zod 3 / Zod 4 overloads that require the
+    // concrete schema type (with `_def.typeName`); the generic `TSchema` erases
+    // it. Field types still come from `useForm<z.infer<TSchema>>`, so cast the
+    // schema at the resolver boundary only.
+    resolver: zodResolver(schema as never),
   });
 }
 
