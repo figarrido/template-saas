@@ -43,6 +43,16 @@ export type OrganizationDetail = {
   entitlements: OrganizationEntitlement[];
 };
 
+export type PlanOption = { planId: string; name: string };
+
+export async function listActivePlans(db: ServiceClient): Promise<PlanOption[]> {
+  return db
+    .select({ planId: schema.plans.plan_id, name: schema.plans.name })
+    .from(schema.plans)
+    .where(eq(schema.plans.is_active, true))
+    .orderBy(asc(schema.plans.name));
+}
+
 function escapeLike(input: string): string {
   return input.replace(/[\\%_]/g, (ch) => `\\${ch}`);
 }

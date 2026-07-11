@@ -26,8 +26,12 @@ export {
   resolveActiveEntitlements,
   listActiveEntitlementPeriods,
   entitlementSourceLabel,
+  grantComp,
+  revokeComp,
+  listActiveComps,
   type EntitlementsApi,
   type EntitlementRow,
   type EntitlementValue,
   type ActiveEntitlementPeriod,
+  type ActiveComp,
 } from './entitlements/index.js';

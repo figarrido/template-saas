@@ -10,8 +10,10 @@ import {
   Button,
 } from '@template/ui';
 import { requireOperator } from '@/lib/auth/gate';
-import { getOrganizationDetail } from '@/lib/data/organizations';
+import { getOrganizationDetail, listActivePlans } from '@/lib/data/organizations';
 import { getAdminDb } from '@/lib/data/db';
+import { listActiveComps } from '@template/billing/entitlements';
+import { CompsPanel } from './comps-panel';
 
 export default async function OrganizationDetailPage({
   params,
@@ -23,6 +25,11 @@ export default async function OrganizationDetailPage({
   const { organizationId } = await params;
   const detail = await getOrganizationDetail(getAdminDb(), organizationId);
   if (!detail) notFound();
+
+  const [plans, comps] = await Promise.all([
+    listActivePlans(getAdminDb()),
+    listActiveComps(getAdminDb(), organizationId),
+  ]);
 
   return (
     <main className="mx-auto max-w-4xl p-6">
@@ -102,6 +109,7 @@ export default async function OrganizationDetailPage({
             )}
           </CardContent>
         </Card>
+        <CompsPanel organizationId={organizationId} plans={plans} comps={comps} />
       </div>
     </main>
   );

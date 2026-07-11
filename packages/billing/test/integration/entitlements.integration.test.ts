@@ -1,7 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import postgres from 'postgres';
 import { getServiceClient } from '@template/db';
-import { createEntitlements, listActiveEntitlementPeriods } from '../../src/entitlements/index.js';
+import {
+  createEntitlements,
+  listActiveEntitlementPeriods,
+  grantComp,
+  revokeComp,
+  listActiveComps,
+} from '../../src/entitlements/index.js';
 
 // Integration suite for the entitlements read API. Runs against the local
 // Supabase stack; gated on `migration-validation` in CI alongside the RLS
@@ -16,6 +22,13 @@ const serviceSql = postgres(DATABASE_URL, { max: 4, prepare: false });
 // Throwaway org — isolated from the seed tenant so tests don't stomp each other.
 const ORG_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
+// Seeded plan with a plan_entitlements → 'pro' mapping.
+const SEED_PLAN = '44444444-4444-4444-4444-444444444444';
+// Seeded user to satisfy the granted_by FK.
+const USER_1 = '11111111-1111-1111-1111-111111111111';
+// Throwaway plan with no plan_entitlements (for the "empty plan rejects" case).
+const EMPTY_PLAN = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+
 const db = getServiceClient({ databaseUrl: DATABASE_URL });
 const entitlements = createEntitlements(db);
 
@@ -24,17 +37,28 @@ beforeAll(async () => {
   await serviceSql`delete from public.entitlements where organization_id = ${ORG_ID}`;
   await serviceSql`delete from public.memberships where organization_id = ${ORG_ID}`;
   await serviceSql`delete from public.organizations where organization_id = ${ORG_ID}`;
+  await serviceSql`delete from public.plan_entitlements where plan_id = ${EMPTY_PLAN}`;
+  await serviceSql`delete from public.plans where plan_id = ${EMPTY_PLAN}`;
 
   await serviceSql`
     insert into public.organizations (organization_id, name, slug)
     values (${ORG_ID}, 'Entitlement Test Org', 'entitlement-test-org')
     on conflict (organization_id) do nothing
   `;
+
+  // Empty plan with no plan_entitlements for the "empty plan rejects" case.
+  await serviceSql`
+    insert into public.plans (plan_id, slug, name, is_active)
+    values (${EMPTY_PLAN}, 'zzz-empty-plan', 'Empty Plan', true)
+    on conflict (plan_id) do nothing
+  `;
 });
 
 afterAll(async () => {
   await serviceSql`delete from public.entitlements where organization_id = ${ORG_ID}`;
   await serviceSql`delete from public.organizations where organization_id = ${ORG_ID}`;
+  await serviceSql`delete from public.plan_entitlements where plan_id = ${EMPTY_PLAN}`;
+  await serviceSql`delete from public.plans where plan_id = ${EMPTY_PLAN}`;
   await serviceSql.end({ timeout: 5 });
 });
 
@@ -129,6 +153,85 @@ describe('entitlements read API — coexistence and precedence', () => {
       await deleteById(billingId);
       await deleteById(grantId);
     }
+  });
+});
+
+describe('Comp write path', () => {
+  // Future expiry ~30 days out.
+  const futureExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  it('grant expands the plan into source=grant rows', async () => {
+    try {
+      const result = await grantComp(db, {
+        organizationId: ORG_ID,
+        planId: SEED_PLAN,
+        grantedBy: USER_1,
+        expiresAt: futureExpiry,
+      });
+      expect(result.keys).toContain('pro');
+
+      expect(await entitlements.has(ORG_ID, 'pro')).toBe(true);
+
+      const periods = await listActiveEntitlementPeriods(db, ORG_ID);
+      expect(periods.some((p) => p.source === 'grant')).toBe(true);
+
+      const comps = await listActiveComps(db, ORG_ID);
+      expect(comps).toHaveLength(1);
+      expect(comps[0]?.planId).toBe(SEED_PLAN);
+      expect(comps[0]?.planName).toBe('Pro');
+      expect(comps[0]?.keys).toContain('pro');
+      expect(comps[0]?.expiresAt).not.toBeNull();
+    } finally {
+      await serviceSql`delete from public.entitlements where organization_id = ${ORG_ID}`;
+    }
+  });
+
+  it('revoke closes the grant', async () => {
+    await grantComp(db, {
+      organizationId: ORG_ID,
+      planId: SEED_PLAN,
+      grantedBy: USER_1,
+      expiresAt: futureExpiry,
+    });
+    try {
+      const { closed } = await revokeComp(db, { organizationId: ORG_ID, planId: SEED_PLAN });
+      expect(closed).toBeGreaterThanOrEqual(1);
+
+      expect(await entitlements.has(ORG_ID, 'pro')).toBe(false);
+      expect(await listActiveComps(db, ORG_ID)).toHaveLength(0);
+    } finally {
+      await serviceSql`delete from public.entitlements where organization_id = ${ORG_ID}`;
+    }
+  });
+
+  it('coexistence: revoking comp leaves billing period intact', async () => {
+    const billingId = await insertPeriod({ source: 'billing' });
+    await grantComp(db, {
+      organizationId: ORG_ID,
+      planId: SEED_PLAN,
+      grantedBy: USER_1,
+      expiresAt: futureExpiry,
+    });
+    try {
+      await revokeComp(db, { organizationId: ORG_ID, planId: SEED_PLAN });
+      expect(await entitlements.has(ORG_ID, 'pro')).toBe(true);
+      expect(await listActiveComps(db, ORG_ID)).toHaveLength(0);
+    } finally {
+      await deleteById(billingId);
+      await serviceSql`delete from public.entitlements where organization_id = ${ORG_ID}`;
+    }
+  });
+
+  it('empty plan rejects with no rows inserted', async () => {
+    await expect(
+      grantComp(db, {
+        organizationId: ORG_ID,
+        planId: EMPTY_PLAN,
+        grantedBy: USER_1,
+        expiresAt: futureExpiry,
+      }),
+    ).rejects.toThrow();
+    expect(await entitlements.has(ORG_ID, 'pro')).toBe(false);
   });
 });
 

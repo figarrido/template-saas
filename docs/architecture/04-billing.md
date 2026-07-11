@@ -66,6 +66,8 @@
 - Not attached to the Org model: that would pull billing into `packages/db` and expand `packages/db`'s purpose beyond DB access.
 - Sub-export (rather than top-level on `packages/billing`) keeps the entitlements API discoverable as its own concept while preserving the package boundary.
 
+**Comp write path (Operator, `apps/admin`):** `grantComp(db, {organizationId, planId, grantedBy, expiresAt})` expands a Plan through `plan_entitlements` into `source='grant'` ledger period rows; `revokeComp(db, {organizationId, planId})` closes that plan's active grant periods (`expires_at=now()`) — the sole permitted ledger mutation. Both append/close only and never touch billing- or seed-sourced periods. Comps never auto-renew. See [ADR 0007](../adr/0007-entitlements-temporal-ledger.md).
+
 **Composition with flags:**
 - The composition helper (`if (ents.has('pro') && flags.isOn('new_dashboard'))`) lives in `packages/flags` but accepts the entitlements API by **injection** — `packages/flags` does not import `packages/billing`. Prevents circular deps and keeps flags swappable in isolation. See [10-feature-flags](./10-feature-flags.md).
 

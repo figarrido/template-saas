@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import postgres from 'postgres';
 import { getServiceClient } from '@template/db';
-import { listOrganizations, getOrganizationDetail } from '../../lib/data/organizations.js';
+import { listOrganizations, getOrganizationDetail, listActivePlans } from '../../lib/data/organizations.js';
 
 // Integration suite for the admin org read API. Runs against the local
 // Supabase stack; gated on `migration-validation` in CI alongside the
@@ -135,5 +135,17 @@ describe('getOrganizationDetail', () => {
   it('nonexistent org returns null', async () => {
     const detail = await getOrganizationDetail(db, 'ffffffff-ffff-ffff-ffff-ffffffffffff');
     expect(detail).toBeNull();
+  });
+});
+
+describe('listActivePlans', () => {
+  it('returns the seeded Pro plan and all entries have string planId and name', async () => {
+    const plans = await listActivePlans(db);
+    const pro = plans.find((p) => p.name === 'Pro');
+    expect(pro).toBeDefined();
+    for (const p of plans) {
+      expect(typeof p.planId).toBe('string');
+      expect(typeof p.name).toBe('string');
+    }
   });
 });

@@ -2,6 +2,14 @@ import { and, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
 import type { ServiceClient, EntitlementKey } from '@template/db';
 import { schema } from '@template/db';
 
+export type ActiveComp = {
+  planId: string;
+  planName: string;
+  keys: EntitlementKey[];
+  startsAt: string;
+  expiresAt: string | null;
+};
+
 export type EntitlementValue = boolean | number | string | Record<string, unknown> | unknown[];
 
 export type EntitlementRow = {
@@ -107,6 +115,111 @@ export function resolveActiveEntitlements(periods: ActivePeriod[]): EntitlementR
  * docs/architecture/04-billing.md § Entitlements: packages/flags receives
  * this API by injection, never by direct import.
  */
+/**
+ * Grant a Comp: expand the Plan via plan_entitlements into source='grant'
+ * ledger period rows. One row per mapped key, all sharing starts_at=now()
+ * (column default) and the chosen expiry. Appends only — never clobbers
+ * billing/seed periods. See docs/adr/0007-entitlements-temporal-ledger.md.
+ * `expiresAt` is an ISO timestamptz string. Throws if the Plan maps no keys.
+ */
+export async function grantComp(
+  db: ServiceClient,
+  input: { organizationId: string; planId: string; grantedBy: string; expiresAt: string },
+): Promise<{ keys: EntitlementKey[] }> {
+  const mappings = await db
+    .select({ key: schema.plan_entitlements.key, value: schema.plan_entitlements.value })
+    .from(schema.plan_entitlements)
+    .where(eq(schema.plan_entitlements.plan_id, input.planId));
+  if (mappings.length === 0) {
+    throw new Error('Plan has no entitlements to grant.');
+  }
+  await db.insert(schema.entitlements).values(
+    mappings.map((m) => ({
+      organization_id: input.organizationId,
+      plan_id: input.planId,
+      key: m.key,
+      value: m.value,
+      source: 'grant' as const,
+      granted_by: input.grantedBy,
+      expires_at: input.expiresAt,
+    })),
+  );
+  return { keys: mappings.map((m) => m.key) };
+}
+
+/**
+ * Revoke a Comp early: close every currently-active source='grant' period
+ * for (org, plan) by setting expires_at=now(). The sole permitted ledger
+ * mutation (ADR 0007). Touches only grant rows for this plan — billing/seed
+ * periods for the same key survive.
+ */
+export async function revokeComp(
+  db: ServiceClient,
+  input: { organizationId: string; planId: string },
+): Promise<{ closed: number }> {
+  const closed = await db
+    .update(schema.entitlements)
+    .set({ expires_at: sql`now()` })
+    .where(
+      and(
+        activeWindow(input.organizationId),
+        eq(schema.entitlements.plan_id, input.planId),
+        eq(schema.entitlements.source, 'grant'),
+      ),
+    )
+    .returning({ id: schema.entitlements.entitlement_id });
+  return { closed: closed.length };
+}
+
+/**
+ * Active Comps for an org, grouped by Plan (the unit an Operator grants and
+ * revokes). One entry per plan; keys are the plan's active grant keys.
+ */
+export async function listActiveComps(
+  db: ServiceClient,
+  organizationId: string,
+): Promise<ActiveComp[]> {
+  const rows = await db
+    .select({
+      planId: schema.entitlements.plan_id,
+      planName: schema.plans.name,
+      key: schema.entitlements.key,
+      startsAt: schema.entitlements.starts_at,
+      expiresAt: schema.entitlements.expires_at,
+    })
+    .from(schema.entitlements)
+    .innerJoin(schema.plans, eq(schema.plans.plan_id, schema.entitlements.plan_id))
+    .where(and(activeWindow(organizationId), eq(schema.entitlements.source, 'grant')))
+    .orderBy(schema.entitlements.starts_at);
+
+  const byPlan = new Map<string, ActiveComp>();
+  for (const r of rows) {
+    if (!r.planId) continue;
+    const existing = byPlan.get(r.planId);
+    if (!existing) {
+      byPlan.set(r.planId, {
+        planId: r.planId,
+        planName: r.planName,
+        keys: [r.key],
+        startsAt: r.startsAt,
+        expiresAt: r.expiresAt,
+      });
+      continue;
+    }
+    if (!existing.keys.includes(r.key)) existing.keys.push(r.key);
+    if (r.startsAt < existing.startsAt) existing.startsAt = r.startsAt;
+    if (existing.expiresAt !== null) {
+      existing.expiresAt =
+        r.expiresAt === null
+          ? null
+          : r.expiresAt > existing.expiresAt
+            ? r.expiresAt
+            : existing.expiresAt;
+    }
+  }
+  return [...byPlan.values()];
+}
+
 export function createEntitlements(db: ServiceClient): EntitlementsApi {
   return {
     async has(organizationId, key) {

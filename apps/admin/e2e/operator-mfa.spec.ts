@@ -108,4 +108,36 @@ test.describe('Operator MFA', () => {
     const response = await page.goto('/');
     expect(response?.status()).toBe(404);
   });
+
+  test('grant a Comp from an org detail page', async ({ page }) => {
+    // Sign in as the seeded operator (factor already enrolled by the first test).
+    await page.goto('/login');
+    await page.fill('input[type="email"]', 'admin@template.test');
+    await page.fill('input[type="password"]', 'password');
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/challenge');
+
+    const code = authenticator.generate(totpSecret);
+    await page.fill('input[inputmode="numeric"]', code);
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/');
+
+    // Navigate to org list and find the seeded Template Org.
+    await page.goto('/organizations');
+    await page.fill('input[type="search"], input[placeholder*="Search"]', 'template-org');
+    await page.click('tr:has-text("template-org") a, tr:has-text("Template Org") a');
+    await page.waitForURL(/\/organizations\/.+/);
+
+    // Fill the Comps grant form: choose Pro plan, pick a future date.
+    const futureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    await page.selectOption('select#planId', { label: 'Pro' });
+    await page.fill('input#expiresAt', futureDate);
+    await page.click('button:has-text("Grant Comp")');
+
+    // Assert the Comps table shows the new row with a Revoke button.
+    await expect(page.getByRole('button', { name: 'Revoke' })).toBeVisible();
+    await expect(page.locator('td').filter({ hasText: 'pro' }).first()).toBeVisible();
+  });
 });
