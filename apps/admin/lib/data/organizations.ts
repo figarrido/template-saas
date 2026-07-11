@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, ilike, or, type SQL } from 'drizzle-orm';
+import { asc, count, desc, eq, ilike, or, type SQL } from 'drizzle-orm';
 import type { ServiceClient } from '@template/db';
 import { schema } from '@template/db';
 import {

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { PageHeader, SearchInput, Card, CardContent, Badge, Button, EmptyState } from '@template/ui';
+import { PageHeader, SearchInput, Card, CardContent, Button, EmptyState } from '@template/ui';
 import { requireOperator } from '@/lib/auth/gate';
 import { listOrganizations } from '@/lib/data/organizations';
 import { getAdminDb } from '@/lib/data/db';
@@ -21,6 +21,9 @@ export default async function OrganizationsPage({
   });
 
   const hasNext = current * pageSize < total;
+
+  const pageHref = (targetPage: number) =>
+    `/organizations?${search ? `q=${encodeURIComponent(search)}&` : ''}page=${targetPage}`;
 
   return (
     <main className="mx-auto max-w-4xl p-6">
@@ -73,16 +76,12 @@ export default async function OrganizationsPage({
         <div className="flex gap-2">
           {current > 1 && (
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/organizations?${search ? `q=${encodeURIComponent(search)}&` : ''}page=${current - 1}`}>
-                Previous
-              </Link>
+              <Link href={pageHref(current - 1)}>Previous</Link>
             </Button>
           )}
           {hasNext && (
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/organizations?${search ? `q=${encodeURIComponent(search)}&` : ''}page=${current + 1}`}>
-                Next
-              </Link>
+              <Link href={pageHref(current + 1)}>Next</Link>
             </Button>
           )}
         </div>
