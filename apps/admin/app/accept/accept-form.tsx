@@ -27,7 +27,10 @@ type Values = z.infer<typeof schema>;
 
 export function AcceptForm({ token, requiresPassword, email }: Props) {
   const router = useRouter();
-  const form = useZodForm(schema);
+  // Default the password to '' so the field's absence in the existing-user
+  // branch (no password input rendered) still passes `z.string()` validation —
+  // otherwise handleSubmit rejects the undefined value and never fires onSubmit.
+  const form = useZodForm(schema, { defaultValues: { password: '' } });
 
   async function onSubmit(values: Values) {
     const result = await acceptOperatorInvitationAction({ token, password: values.password });
