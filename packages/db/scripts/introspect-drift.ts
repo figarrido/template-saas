@@ -54,13 +54,24 @@ const freshRelations = readFileSync(resolve(tmp, 'relations.ts'), 'utf8');
 const committedSchemaContent = readFileSync(committedSchema, 'utf8');
 const committedRelationsContent = readFileSync(committedRelations, 'utf8');
 
+// Print a unified diff on drift so failures are diagnosable from the CI log.
+const showDiff = (committedPath: string, freshName: string) => {
+  try {
+    execFileSync('diff', ['-u', committedPath, resolve(tmp, freshName)], { stdio: 'inherit' });
+  } catch {
+    // `diff` exits 1 when files differ — expected; the diff is already printed.
+  }
+};
+
 let drift = 0;
 if (freshSchema !== committedSchemaContent) {
   console.error('src/drizzle/schema.ts is out of date. Run `pnpm db:introspect`.');
+  showDiff(committedSchema, 'schema.ts');
   drift++;
 }
 if (freshRelations !== committedRelationsContent) {
   console.error('src/drizzle/relations.ts is out of date. Run `pnpm db:introspect`.');
+  showDiff(committedRelations, 'relations.ts');
   drift++;
 }
 
