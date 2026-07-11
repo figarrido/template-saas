@@ -1,6 +1,6 @@
 import 'server-only';
 import { eq, and, desc, sql } from 'drizzle-orm';
-import { schema } from '@template/db';
+import { schema, type ServiceClient } from '@template/db';
 import { env } from '@template/env/admin';
 import { selectEmailProvider } from '@template/email';
 import { OperatorInviteEmail } from '@template/email/templates';
@@ -149,11 +149,12 @@ export function getOperatorInvitationPorts(): OperatorInvitationPorts {
   };
 }
 
-export async function listPendingOperatorInvitations(): Promise<
-  Array<{ email: string; invitedAt: string; expiresAt: string }>
-> {
-  const rows = await getAdminDb()
+export async function listPendingOperatorInvitations(
+  db: ServiceClient,
+): Promise<Array<{ operatorInvitationId: string; email: string; invitedAt: string; expiresAt: string }>> {
+  const rows = await db
     .select({
+      operatorInvitationId: schema.operator_invitations.operator_invitation_id,
       email: schema.operator_invitations.email,
       invitedAt: schema.operator_invitations.created_at,
       expiresAt: schema.operator_invitations.expires_at,
@@ -162,4 +163,21 @@ export async function listPendingOperatorInvitations(): Promise<
     .where(eq(schema.operator_invitations.status, 'pending'))
     .orderBy(desc(schema.operator_invitations.created_at));
   return rows;
+}
+
+export async function revokeOperatorInvitation(
+  db: ServiceClient,
+  { operatorInvitationId }: { operatorInvitationId: string },
+): Promise<{ revoked: boolean }> {
+  const rows = await db
+    .update(schema.operator_invitations)
+    .set({ status: 'revoked' })
+    .where(
+      and(
+        eq(schema.operator_invitations.operator_invitation_id, operatorInvitationId),
+        eq(schema.operator_invitations.status, 'pending'),
+      ),
+    )
+    .returning({ id: schema.operator_invitations.operator_invitation_id });
+  return { revoked: rows.length === 1 };
 }

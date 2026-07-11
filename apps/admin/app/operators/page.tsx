@@ -1,12 +1,19 @@
-import { PageHeader, Card, CardContent, EmptyState } from '@template/ui';
+import { PageHeader, Heading } from '@template/ui';
 import { requireOperator } from '@/lib/auth/gate';
+import { getAdminDb } from '@/lib/data/db';
+import { listOperators } from '@/lib/data/operators';
 import { listPendingOperatorInvitations } from '@/lib/data/operator-invitations';
 import { InviteOperatorForm } from './invite-form';
+import { OperatorsTable } from './operators-table';
+import { PendingInvitationsTable } from './pending-invitations-table';
 
 export default async function OperatorsPage() {
-  await requireOperator();
-
-  const pending = await listPendingOperatorInvitations();
+  const currentUserId = await requireOperator();
+  const db = getAdminDb();
+  const [operators, pending] = await Promise.all([
+    listOperators(db),
+    listPendingOperatorInvitations(db),
+  ]);
 
   return (
     <main className="mx-auto max-w-4xl p-6">
@@ -16,36 +23,15 @@ export default async function OperatorsPage() {
         <InviteOperatorForm />
       </div>
 
-      <Card className="mt-6">
-        <CardContent className="p-0">
-          {pending.length === 0 ? (
-            <EmptyState title="No pending invitations" description="Invited operators will appear here." />
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Email</th>
-                  <th className="px-4 py-3 font-medium">Invited</th>
-                  <th className="px-4 py-3 font-medium">Expires</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pending.map((inv) => (
-                  <tr key={inv.email} className="border-b last:border-0 hover:bg-muted/50">
-                    <td className="px-4 py-3">{inv.email}</td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {new Date(inv.invitedAt).toISOString().slice(0, 10)}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {new Date(inv.expiresAt).toISOString().slice(0, 10)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
+      <Heading className="mt-8 text-lg">Operators</Heading>
+      <div className="mt-3">
+        <OperatorsTable operators={operators} currentUserId={currentUserId} />
+      </div>
+
+      <Heading className="mt-8 text-lg">Pending invitations</Heading>
+      <div className="mt-3">
+        <PendingInvitationsTable invitations={pending} />
+      </div>
     </main>
   );
 }
