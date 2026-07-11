@@ -32,14 +32,20 @@ export async function hashRecoveryCode(code: string): Promise<string> {
     .join('');
 }
 
+// base64url → padded standard base64, ready for atob(). Appends the 0/1/2
+// '=' chars atob() needs; an unpadded length ≡ 2 (mod 4) needs two, so a
+// naive one-char pad would leave an invalid string that atob() rejects.
+function base64urlToBase64(input: string): string {
+  const base64 = input.replace(/-/g, '+').replace(/_/g, '/');
+  return base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+}
+
 export function readJwtSessionId(accessToken: string | null | undefined): string | null {
   try {
     if (!accessToken) return null;
     const parts = accessToken.split('.');
     if (parts.length < 2) return null;
-    const payload = parts[1]!.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = payload + '=='.slice((payload.length + 3) % 4 || 4);
-    const json = atob(padded);
+    const json = atob(base64urlToBase64(parts[1]!));
     const parsed = JSON.parse(json) as Record<string, unknown>;
     const sessionId = parsed['session_id'];
     return typeof sessionId === 'string' ? sessionId : null;
@@ -65,8 +71,7 @@ function base64urlEncode(buf: ArrayBuffer): string {
 
 function base64urlDecode(str: string): ArrayBuffer | null {
   try {
-    const padded = str.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice((str.length + 3) % 4 || 4);
-    const binary = atob(padded);
+    const binary = atob(base64urlToBase64(str));
     const buf = new ArrayBuffer(binary.length);
     const view = new Uint8Array(buf);
     for (let i = 0; i < binary.length; i++) {

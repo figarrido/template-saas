@@ -77,6 +77,15 @@ describe('readJwtSessionId', () => {
     expect(readJwtSessionId(token)).toBe('sess-1');
   });
 
+  it('decodes payloads across every base64url length residue', () => {
+    // Real access-token payloads land on any length mod 4; a payload whose
+    // base64url length is ≡ 2 (mod 4) needs two '=' pad chars to decode.
+    for (let i = 0; i < 8; i++) {
+      const token = makeJwt({ session_id: `sess-${'x'.repeat(i)}`, sub: 'user-1' });
+      expect(readJwtSessionId(token)).toBe(`sess-${'x'.repeat(i)}`);
+    }
+  });
+
   it('returns null for empty string', () => {
     expect(readJwtSessionId('')).toBeNull();
   });
