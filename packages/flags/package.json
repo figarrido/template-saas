@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@openfeature/server-sdk": "^1.18.0",
-    "posthog-node": "^4.0.0"
+    "posthog-node": "^5.40.0"
   },
   "devDependencies": {
     "@template/config": "workspace:*",
