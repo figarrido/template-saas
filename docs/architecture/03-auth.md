@@ -12,7 +12,10 @@
 - Admin app lives on a dedicated subdomain (e.g., `admin.example.com`), separate Vercel project. See [01-stack](./01-stack.md).
 
 **Access enforcement (app-layer, ships in template):**
-- Next.js middleware in `apps/admin` enforces, in order: (1) authenticated session, (2) `admin_users` row exists for the user (an **Operator** — a User with backoffice access, tracked separately from org memberships), (3) MFA factor present and verified within the session lifetime. Any failure → 404 (not 403 — admin existence shouldn't be discoverable).
+- Next.js middleware in `apps/admin` enforces, in order: (1) authenticated session, (2) `admin_users` row exists for the user (an **Operator** — a User with backoffice access, tracked separately from org memberships), (3) a **verified TOTP factor** satisfying `aal2` (Supabase-native), or a redeemed single-use recovery code (see `admin_recovery_codes` table and [ADR 0006](../adr/0006-operator-access-model.md)). Any failure → 404 (not 403 — admin existence shouldn't be discoverable).
+- The gate is implemented as `resolveAdminGate()` in `apps/admin/lib/auth/gate.ts`, calling the pure `gateAdmin()` from `packages/auth`. The middleware stays CSP-only; the gate runs in server components where DB + Supabase MFA calls are available.
+- Recovery-code elevation is a stateless HMAC-SHA256 cookie (keyed to the Supabase `session_id` so it expires with the session). See `packages/auth/src/admin-mfa.ts`.
+- Total-factor-loss break-glass: see [docs/runbooks/operator-mfa-break-glass.md](../runbooks/operator-mfa-break-glass.md).
 - `apps/admin` always uses the service-role Supabase client server-side for cross-org queries; never the user's JWT. This is the single legitimate place service-role appears outside of the worker services.
 - Audit log: every state-changing admin action writes to an append-only `admin_audit_log` table (actor, target, action, before/after diff, timestamp, IP).
 
@@ -24,7 +27,7 @@
 - Subdomain isolation gives cookie-scope separation and lets edge controls be added without code changes.
 - 404 (instead of 403) for missing-admin status leaks slightly less but breaks "helpful error message" UX. Accepted — wrong audience for friendly errors.
 
-**Related:** [01-stack](./01-stack.md), [02-data](./02-data.md), [09-api-boundary](./09-api-boundary.md), [10-feature-flags](./10-feature-flags.md)
+**Related:** [01-stack](./01-stack.md), [02-data](./02-data.md), [09-api-boundary](./09-api-boundary.md), [10-feature-flags](./10-feature-flags.md), [ADR 0006](../adr/0006-operator-access-model.md), [runbooks/operator-mfa-break-glass](../runbooks/operator-mfa-break-glass.md)
 
 ---
 
@@ -50,7 +53,7 @@
 
 ## End-user authentication flows (`apps/web`)
 
-**Decision:** Ship the full end-user credential surface in `apps/web`: **sign-up, sign-in, sign-out, forgot-password, reset-password, change-password, change-email, email-verification + resend**, plus the first-login routing redirect. All of `apps/admin` auth (Operator sign-in + the mandatory-MFA enrollment/challenge/recovery-codes stack) is a **separate follow-up build** — admin sign-in is inseparable from the MFA gate, so they ship together, not here. Also deferred: end-user MFA, self-serve account deletion (a [recipe](../recipes/) — touches the GDPR non-goal), an active-sessions list, CAPTCHA on sign-up (a hardening recipe), and invite-aware sign-up (invitation acceptance is its own flow — see below).
+**Decision:** Ship the full end-user credential surface in `apps/web`: **sign-up, sign-in, sign-out, forgot-password, reset-password, change-password, change-email, email-verification + resend**, plus the first-login routing redirect. **Operator sign-in + mandatory-TOTP-MFA enrollment/challenge/recovery-codes** are now **built** in `apps/admin` per [ADR 0006](../adr/0006-operator-access-model.md) (routes `/login`, `/enroll`, `/challenge`; recovery-code generation and redemption; stateless elevation cookie). Remaining deferrals: end-user MFA, self-serve account deletion (a [recipe](../recipes/) — touches the GDPR non-goal), an active-sessions list, CAPTCHA on sign-up (a hardening recipe), invite-aware sign-up (invitation acceptance is its own flow — see below), Operator invitations and peer MFA reset (sibling issues under PRD #22).
 
 ### Execution model
 

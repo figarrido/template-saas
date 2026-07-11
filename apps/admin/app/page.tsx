@@ -1,27 +1,14 @@
-import { notFound } from 'next/navigation';
-import { cookies } from 'next/headers';
-import { getUserClient } from '@template/db';
-import { gateAdmin } from '@template/auth';
-import { env } from '@template/env/admin';
-import { lookupAdminStatus } from '@/lib/data/admin';
+import { notFound, redirect } from 'next/navigation';
+import { resolveAdminGate } from '@/lib/auth/gate';
 
-// Apply gateAdmin per docs/architecture/03-auth.md. The MFA check is
-// stubbed until apps/admin gets a real enrolment flow.
 export default async function AdminIndex() {
-  const supabase = getUserClient({
-    supabaseUrl: env.NEXT_PUBLIC_SUPABASE_URL,
-    supabasePublishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-    cookies: await cookieAdapter(),
-  });
-  const { data } = await supabase.auth.getUser();
-  const session = { user: data.user ? { id: data.user.id } : null };
+  const gate = await resolveAdminGate();
 
-  const isAdmin = session.user ? await lookupAdminStatus(session.user.id) : false;
-  // MFA stub — real implementation checks Supabase Auth amr / aal2.
-  const mfaVerified = isAdmin;
-
-  const gate = gateAdmin(session, { isAdmin, mfaVerified });
-  if (!gate.ok) notFound();
+  if (!gate.ok) {
+    if (gate.reason === 'enroll') redirect('/enroll');
+    if (gate.reason === 'challenge') redirect('/challenge');
+    notFound();
+  }
 
   return (
     <main className="mx-auto max-w-2xl p-6">
@@ -29,14 +16,4 @@ export default async function AdminIndex() {
       <p className="mt-4 text-muted-foreground">Internal admin surface.</p>
     </main>
   );
-}
-
-async function cookieAdapter() {
-  const cookieStore = await cookies();
-  return {
-    getAll: () => cookieStore.getAll(),
-    setAll: (cs: { name: string; value: string; options?: Record<string, unknown> }[]) => {
-      for (const c of cs) cookieStore.set(c.name, c.value, c.options ?? {});
-    },
-  };
 }

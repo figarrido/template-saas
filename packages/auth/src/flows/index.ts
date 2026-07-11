@@ -31,3 +31,9 @@ export { destinationForOrganizations, type Destination, type OrgRef } from './ro
 export { AUTH_MESSAGES } from './messages.js';
 export { invalidInputFirstIssue } from './errors.js';
 export type { ActionResult, ActionErrorCode, AuthClient } from './types.js';
+export {
+  getAdminAssurance,
+  getAdminTotpFactor,
+  enrollAdminTotp,
+  verifyAdminTotp,
+} from './admin-mfa.js';

@@ -39,6 +39,33 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_recovery_codes: {
+        Row: {
+          admin_recovery_code_id: string
+          code_hash: string
+          created_at: string
+          updated_at: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          admin_recovery_code_id?: string
+          code_hash: string
+          created_at?: string
+          updated_at?: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          admin_recovery_code_id?: string
+          code_hash?: string
+          created_at?: string
+          updated_at?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       admin_users: {
         Row: {
           granted_at: string

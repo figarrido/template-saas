@@ -15,7 +15,18 @@ export {
   type SessionLike,
   type AdminCheck,
   type AdminGateResult,
+  type AssuranceLevel,
 } from './middleware-helpers.js';
+export {
+  generateRecoveryCodes,
+  normalizeRecoveryCode,
+  hashRecoveryCode,
+  readJwtSessionId,
+  signRecoveryElevation,
+  verifyRecoveryElevation,
+  RECOVERY_CODE_COUNT,
+  ADMIN_RECOVERY_ELEVATION_COOKIE,
+} from './admin-mfa.js';
 export { PASSWORD_POLICY } from './policy.js';
 export {
   emailSchema,
@@ -55,6 +66,10 @@ export {
   EMAIL_OTP_TYPES,
   AUTH_MESSAGES,
   invalidInputFirstIssue,
+  getAdminAssurance,
+  getAdminTotpFactor,
+  enrollAdminTotp,
+  verifyAdminTotp,
   type SignInResult,
   type SignOutResult,
   type SignUpResult,

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { AuthClient } from '../src/flows/types.js';
 import { signIn } from '../src/flows/sign-in.js';
 import { signOut } from '../src/flows/sign-out.js';
@@ -9,10 +9,24 @@ import { updatePassword } from '../src/flows/update-password.js';
 import { verifyEmailToken, isEmailOtpType } from '../src/flows/verify-email.js';
 import { changePassword } from '../src/flows/change-password.js';
 import { changeEmail } from '../src/flows/change-email.js';
+import {
+  getAdminAssurance,
+  getAdminTotpFactor,
+  enrollAdminTotp,
+  verifyAdminTotp,
+} from '../src/flows/admin-mfa.js';
 
 // Unit tests with a fake supabase client. The full round-trip against local
 // Supabase lives in test/integration/sign-in.integration.test.ts; here we
 // pin the ADR-0002 mapping deterministically.
+
+type MfaStub = {
+  getAuthenticatorAssuranceLevel?: () => Promise<unknown>;
+  listFactors?: () => Promise<unknown>;
+  enroll?: (args: { factorType: string; friendlyName?: string }) => Promise<unknown>;
+  unenroll?: (args: { factorId: string }) => Promise<unknown>;
+  challengeAndVerify?: (args: { factorId: string; code: string }) => Promise<unknown>;
+};
 
 // The flows only touch `auth.signInWithPassword`, `auth.signOut`, and
 // `auth.resend`. We fake them with structurally-compatible shapes — typed
@@ -38,6 +52,7 @@ function fakeClient(opts: {
   ) => Promise<unknown>;
   getSession?: () => Promise<{ data: { session: unknown }; error: unknown }>;
   getUser?: () => Promise<unknown>;
+  mfa?: MfaStub;
 }): AuthClient {
   return {
     auth: {
@@ -53,6 +68,26 @@ function fakeClient(opts: {
         opts.getSession ??
         (async () => ({ data: { session: { access_token: 't' } }, error: null })),
       getUser: opts.getUser ?? (async () => ({ data: { user: null }, error: null })),
+      mfa: {
+        getAuthenticatorAssuranceLevel:
+          opts.mfa?.getAuthenticatorAssuranceLevel ??
+          (async () => ({ data: { currentLevel: 'aal1', nextLevel: 'aal1' }, error: null })),
+        listFactors:
+          opts.mfa?.listFactors ??
+          (async () => ({ data: { totp: [], phone: [] }, error: null })),
+        enroll:
+          opts.mfa?.enroll ??
+          (async () => ({
+            data: {
+              id: 'factor-1',
+              totp: { qr_code: 'data:image/png;base64,abc', secret: 'SECRET', uri: 'otpauth://...' },
+            },
+            error: null,
+          })),
+        unenroll: opts.mfa?.unenroll ?? (async () => ({ data: {}, error: null })),
+        challengeAndVerify:
+          opts.mfa?.challengeAndVerify ?? (async () => ({ data: {}, error: null })),
+      },
     },
   } as unknown as AuthClient;
 }
@@ -942,5 +977,179 @@ describe('changeEmail flow', () => {
 
     expect(result.ok).toBe(true);
     expect(updateOptions).toBeUndefined();
+  });
+});
+
+describe('getAdminAssurance', () => {
+  it('passes through currentLevel and nextLevel', async () => {
+    const client = fakeClient({
+      mfa: {
+        getAuthenticatorAssuranceLevel: async () => ({
+          data: { currentLevel: 'aal1', nextLevel: 'aal2' },
+          error: null,
+        }),
+      },
+    });
+    const result = await getAdminAssurance(client);
+    expect(result).toEqual({ currentLevel: 'aal1', nextLevel: 'aal2' });
+  });
+
+  it('returns null for nullish data', async () => {
+    const client = fakeClient({
+      mfa: {
+        getAuthenticatorAssuranceLevel: async () => ({ data: null, error: null }),
+      },
+    });
+    const result = await getAdminAssurance(client);
+    expect(result).toEqual({ currentLevel: null, nextLevel: null });
+  });
+});
+
+describe('getAdminTotpFactor', () => {
+  it('prefers a verified factor and returns verified:true', async () => {
+    const client = fakeClient({
+      mfa: {
+        listFactors: async () => ({
+          data: {
+            totp: [
+              { id: 'unverified-1', status: 'unverified' },
+              { id: 'verified-1', status: 'verified' },
+            ],
+            phone: [],
+          },
+          error: null,
+        }),
+      },
+    });
+    const result = await getAdminTotpFactor(client);
+    expect(result).toEqual({ factorId: 'verified-1', verified: true });
+  });
+
+  it('returns verified:false for an unverified factor', async () => {
+    const client = fakeClient({
+      mfa: {
+        listFactors: async () => ({
+          data: { totp: [{ id: 'unverified-1', status: 'unverified' }], phone: [] },
+          error: null,
+        }),
+      },
+    });
+    const result = await getAdminTotpFactor(client);
+    expect(result).toEqual({ factorId: 'unverified-1', verified: false });
+  });
+
+  it('returns null factorId when no totp factors exist', async () => {
+    const client = fakeClient({
+      mfa: {
+        listFactors: async () => ({ data: { totp: [], phone: [] }, error: null }),
+      },
+    });
+    const result = await getAdminTotpFactor(client);
+    expect(result).toEqual({ factorId: null, verified: false });
+  });
+});
+
+describe('enrollAdminTotp', () => {
+  it('unenrolls unverified factors before enrolling', async () => {
+    const unenrollCalls: string[] = [];
+    const client = fakeClient({
+      mfa: {
+        listFactors: async () => ({
+          data: {
+            totp: [
+              { id: 'stale-1', status: 'unverified' },
+              { id: 'stale-2', status: 'unverified' },
+            ],
+            phone: [],
+          },
+          error: null,
+        }),
+        unenroll: async ({ factorId }) => {
+          unenrollCalls.push(factorId);
+          return { data: {}, error: null };
+        },
+        enroll: async () => ({
+          data: {
+            id: 'factor-new',
+            totp: { qr_code: 'data:image/png;base64,abc', secret: 'SECRET', uri: 'otpauth://...' },
+          },
+          error: null,
+        }),
+      },
+    });
+    const result = await enrollAdminTotp(client);
+    expect(unenrollCalls).toContain('stale-1');
+    expect(unenrollCalls).toContain('stale-2');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.factorId).toBe('factor-new');
+    expect(result.data.qrCode).toBe('data:image/png;base64,abc');
+    expect(result.data.secret).toBe('SECRET');
+    expect(result.data.uri).toBe('otpauth://...');
+  });
+
+  it('does not unenroll verified factors', async () => {
+    const unenrollCalls: string[] = [];
+    const client = fakeClient({
+      mfa: {
+        listFactors: async () => ({
+          data: {
+            totp: [{ id: 'verified-1', status: 'verified' }],
+            phone: [],
+          },
+          error: null,
+        }),
+        unenroll: async ({ factorId }) => {
+          unenrollCalls.push(factorId);
+          return { data: {}, error: null };
+        },
+        enroll: async () => ({
+          data: {
+            id: 'factor-new',
+            totp: { qr_code: 'qr', secret: 'S', uri: 'uri' },
+          },
+          error: null,
+        }),
+      },
+    });
+    await enrollAdminTotp(client);
+    expect(unenrollCalls).not.toContain('verified-1');
+  });
+
+  it('maps an enroll error to unexpected', async () => {
+    const client = fakeClient({
+      mfa: {
+        listFactors: async () => ({ data: { totp: [], phone: [] }, error: null }),
+        enroll: async () => ({ data: null, error: { message: 'rate limit' } }),
+      },
+    });
+    const result = await enrollAdminTotp(client);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('unexpected');
+  });
+});
+
+describe('verifyAdminTotp', () => {
+  it('returns ok:true when challengeAndVerify has no error', async () => {
+    const client = fakeClient({
+      mfa: {
+        challengeAndVerify: async () => ({ data: {}, error: null }),
+      },
+    });
+    const result = await verifyAdminTotp(client, { factorId: 'f-1', code: '123456' });
+    expect(result.ok).toBe(true);
+  });
+
+  it('returns invalid-credentials when challengeAndVerify errors', async () => {
+    const client = fakeClient({
+      mfa: {
+        challengeAndVerify: async () => ({ data: null, error: { message: 'invalid otp' } }),
+      },
+    });
+    const result = await verifyAdminTotp(client, { factorId: 'f-1', code: '000000' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid-credentials');
   });
 });

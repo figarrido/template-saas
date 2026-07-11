@@ -15,29 +15,38 @@ export function readActiveOrgFromCookie(cookieValue: string | undefined | null):
 
 export type SessionLike = { user: { id: string } | null };
 
+export type AssuranceLevel = 'aal1' | 'aal2';
+
 export type AdminCheck = {
   isAdmin: boolean;
-  mfaVerified: boolean;
+  currentLevel: AssuranceLevel | null; // Supabase getAuthenticatorAssuranceLevel().currentLevel
+  nextLevel: AssuranceLevel | null;    // .nextLevel — 'aal2' iff a *verified* factor exists
+  recoveryElevated: boolean;           // app-managed: valid recovery-elevation cookie for this session
 };
 
 export type AdminGateResult =
   | { ok: true; userId: string }
-  | { ok: false; reason: 'no-session' | 'not-admin' | 'mfa-not-verified' };
+  | { ok: false; reason: 'no-session' | 'not-admin' | 'enroll' | 'challenge' };
 
 /**
- * Apply the admin enforcement chain in order:
- *   1. session present?
- *   2. user is in admin_users (revoked_at IS NULL)?
- *   3. MFA verified within the session lifetime?
- *
- * Any failure resolves to `{ ok: false }`. The caller renders a 404 from a
- * single branch; the reason is for logging only.
+ * AAL-aware admin gate (ADR 0006). Order:
+ *   1. session present?            no  → 'no-session' (404)
+ *   2. in admin_users?             no  → 'not-admin'  (404)
+ *   3. session already aal2        yes → ok
+ *   4. verified factor exists (nextLevel==='aal2')?
+ *        recovery-elevated this session → ok
+ *        else                           → 'challenge'
+ *   5. no verified factor          → 'enroll'
  */
 export function gateAdmin(session: SessionLike, check: AdminCheck): AdminGateResult {
   if (!session.user) return { ok: false, reason: 'no-session' };
   if (!check.isAdmin) return { ok: false, reason: 'not-admin' };
-  if (!check.mfaVerified) return { ok: false, reason: 'mfa-not-verified' };
-  return { ok: true, userId: session.user.id };
+  if (check.currentLevel === 'aal2') return { ok: true, userId: session.user.id };
+  if (check.nextLevel === 'aal2') {
+    if (check.recoveryElevated) return { ok: true, userId: session.user.id };
+    return { ok: false, reason: 'challenge' };
+  }
+  return { ok: false, reason: 'enroll' };
 }
 
 /**

@@ -56,6 +56,25 @@ export const admin_users = pgTable("admin_users", {
 	}
 });
 
+export const admin_recovery_codes = pgTable("admin_recovery_codes", {
+	admin_recovery_code_id: uuid().default(sql`uuid_generate_v7()`).primaryKey().notNull(),
+	user_id: uuid().notNull(),
+	code_hash: text().notNull(),
+	used_at: timestamp({ withTimezone: true, mode: 'string' }),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => {
+	return {
+		admin_recovery_codes_unused_idx: index("admin_recovery_codes_unused_idx").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")).where(sql`(used_at IS NULL)`),
+		admin_recovery_codes_user_id_fkey: foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [authUsers.id],
+			name: "admin_recovery_codes_user_id_fkey"
+		}).onDelete("cascade"),
+		admin_recovery_codes_user_id_code_hash_key: unique("admin_recovery_codes_user_id_code_hash_key").on(table.user_id, table.code_hash),
+	}
+});
+
 export const organizations = pgTable("organizations", {
 	organization_id: uuid().default(sql`uuid_generate_v7()`).primaryKey().notNull(),
 	name: text().notNull(),

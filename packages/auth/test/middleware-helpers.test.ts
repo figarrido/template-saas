@@ -19,27 +19,58 @@ describe('readActiveOrgFromCookie', () => {
 });
 
 describe('gateAdmin', () => {
-  it('passes when all three signals are present', () => {
+  it('blocks no session', () => {
+    expect(
+      gateAdmin({ user: null }, { isAdmin: true, currentLevel: 'aal2', nextLevel: 'aal2', recoveryElevated: false }),
+    ).toMatchObject({ ok: false, reason: 'no-session' });
+  });
+
+  it('blocks non-admin', () => {
+    expect(
+      gateAdmin({ user: { id: 'u-1' } }, { isAdmin: false, currentLevel: 'aal2', nextLevel: 'aal2', recoveryElevated: false }),
+    ).toMatchObject({ ok: false, reason: 'not-admin' });
+  });
+
+  it('passes when session is already aal2 (recoveryElevated irrelevant)', () => {
     const r = gateAdmin(
       { user: { id: 'u-1' } },
-      { isAdmin: true, mfaVerified: true },
+      { isAdmin: true, currentLevel: 'aal2', nextLevel: 'aal2', recoveryElevated: false },
     );
     expect(r).toEqual({ ok: true, userId: 'u-1' });
   });
-  it('blocks no session', () => {
-    expect(
-      gateAdmin({ user: null }, { isAdmin: true, mfaVerified: true }),
-    ).toMatchObject({ ok: false, reason: 'no-session' });
+
+  it('passes when session is aal2 and recoveryElevated is true', () => {
+    const r = gateAdmin(
+      { user: { id: 'u-1' } },
+      { isAdmin: true, currentLevel: 'aal2', nextLevel: 'aal2', recoveryElevated: true },
+    );
+    expect(r).toEqual({ ok: true, userId: 'u-1' });
   });
-  it('blocks non-admin', () => {
+
+  it('returns enroll when nextLevel is aal1 (no verified factor)', () => {
     expect(
-      gateAdmin({ user: { id: 'u-1' } }, { isAdmin: false, mfaVerified: true }),
-    ).toMatchObject({ ok: false, reason: 'not-admin' });
+      gateAdmin({ user: { id: 'u-1' } }, { isAdmin: true, currentLevel: 'aal1', nextLevel: 'aal1', recoveryElevated: false }),
+    ).toMatchObject({ ok: false, reason: 'enroll' });
   });
-  it('blocks mfa not verified', () => {
+
+  it('returns challenge when nextLevel is aal2 and not recovery-elevated', () => {
     expect(
-      gateAdmin({ user: { id: 'u-1' } }, { isAdmin: true, mfaVerified: false }),
-    ).toMatchObject({ ok: false, reason: 'mfa-not-verified' });
+      gateAdmin({ user: { id: 'u-1' } }, { isAdmin: true, currentLevel: 'aal1', nextLevel: 'aal2', recoveryElevated: false }),
+    ).toMatchObject({ ok: false, reason: 'challenge' });
+  });
+
+  it('passes when nextLevel is aal2 and recovery-elevated', () => {
+    const r = gateAdmin(
+      { user: { id: 'u-1' } },
+      { isAdmin: true, currentLevel: 'aal1', nextLevel: 'aal2', recoveryElevated: true },
+    );
+    expect(r).toEqual({ ok: true, userId: 'u-1' });
+  });
+
+  it('returns enroll when both levels are null (defensive case)', () => {
+    expect(
+      gateAdmin({ user: { id: 'u-1' } }, { isAdmin: true, currentLevel: null, nextLevel: null, recoveryElevated: false }),
+    ).toMatchObject({ ok: false, reason: 'enroll' });
   });
 });
 
