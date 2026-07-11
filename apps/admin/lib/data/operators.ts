@@ -64,10 +64,15 @@ export async function resetOperatorMfa(
   db: ServiceClient,
   { userId }: { userId: string },
 ): Promise<{ deletedFactorCount: number }> {
-  const { data } = await authClient.auth.admin.mfa.listFactors({ userId });
+  const { data, error } = await authClient.auth.admin.mfa.listFactors({ userId });
+  if (error) throw error;
   const factors = data?.factors ?? [];
   for (const factor of factors) {
-    await authClient.auth.admin.mfa.deleteFactor({ id: factor.id, userId });
+    const { error: deleteError } = await authClient.auth.admin.mfa.deleteFactor({
+      id: factor.id,
+      userId,
+    });
+    if (deleteError) throw deleteError;
   }
   await db
     .delete(schema.admin_recovery_codes)
