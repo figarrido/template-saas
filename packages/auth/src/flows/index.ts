@@ -37,3 +37,10 @@ export {
   enrollAdminTotp,
   verifyAdminTotp,
 } from './admin-mfa.js';
+export {
+  createOperatorInvitation,
+  acceptOperatorInvitation,
+  previewOperatorInvitation,
+  type OperatorInvitationPorts,
+  type OperatorInvitationRow,
+} from './operator-invitations.js';

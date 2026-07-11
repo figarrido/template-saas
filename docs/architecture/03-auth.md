@@ -139,6 +139,18 @@
 - Action set is extensible per derived project; the role enum rarely needs extension.
 - Reused by middleware, Server Actions, and Route Handlers so the auth decision is in one place.
 
+### Operator invitation & acceptance
+
+**Decision:** Operator onboarding is **built** per [ADR 0006](../adr/0006-operator-access-model.md): an existing Operator invites another by email via the `/operators` page in `apps/admin`. A new `operator_invitations` row stores only the **SHA-256 hash** of the raw token (the raw token is emailed via `OperatorInviteEmail`), plus `status`, `invited_by` (references `auth.users`, not `profiles`), and a 7-day `expires_at`. Clicking the link opens the public `/accept` page; acceptance provisions a new `auth.users` account (via GoTrue admin `createUser`, `email_confirm: true`) or reuses an existing one, records the `admin_users` grant, marks the invitation `accepted`, and writes `admin_audit_log`. The new Operator is routed to `/login`; the existing AAL gate forces them into `/enroll` on next sign-in.
+
+The security-critical lifecycle lives as pure injectable flow functions in `packages/auth/src/flows/operator-invitations.ts` (`createOperatorInvitation`, `acceptOperatorInvitation`, `previewOperatorInvitation`). `apps/admin` supplies the real ports and stays a thin adapter.
+
+**Why:** Token hash–only storage prevents a DB read from revealing the raw token (mirrors `admin_recovery_codes`). Injection makes the lifecycle unit-testable without a DB. Reuse-vs-provision eliminates duplicate identity risk. Routing to `/login` (not auto-sign-in) lets new Operators set their own session; the existing AAL gate then forces TOTP enrollment.
+
+**Tradeoffs:** Operators cannot self-register — invitation is the only door (ADR 0006 flat model). Revocation and peer MFA reset are ADR 0006 goals deferred to follow-up issues.
+
+**Related:** [ADR 0006](../adr/0006-operator-access-model.md)
+
 ### Not in scope
 
 - Auto-join-by-email-domain at template level — security footgun by default. Recipe in [recipes/email-domain-orgs.md](../recipes/email-domain-orgs.md) for derived projects that want it.

@@ -27,6 +27,14 @@ export {
   RECOVERY_CODE_COUNT,
   ADMIN_RECOVERY_ELEVATION_COOKIE,
 } from './admin-mfa.js';
+export {
+  generateOperatorInvitationToken,
+  hashOperatorInvitationToken,
+  operatorInvitationExpiry,
+  isOperatorInvitationAcceptable,
+  OPERATOR_INVITATION_TTL_DAYS,
+  type OperatorInvitationStatus,
+} from './operator-invitations.js';
 export { PASSWORD_POLICY } from './policy.js';
 export {
   emailSchema,
@@ -70,6 +78,11 @@ export {
   getAdminTotpFactor,
   enrollAdminTotp,
   verifyAdminTotp,
+  createOperatorInvitation,
+  acceptOperatorInvitation,
+  previewOperatorInvitation,
+  type OperatorInvitationPorts,
+  type OperatorInvitationRow,
   type SignInResult,
   type SignOutResult,
   type SignUpResult,

@@ -51,4 +51,7 @@ export const AUTH_MESSAGES = {
   // hitting Supabase so the form gives an actionable error instead of a
   // silent no-op.
   emailUnchanged: 'New email is the same as your current email.',
+  operatorInviteInvalidEmail: 'Enter a valid email address.',
+  operatorAlreadyActive: 'That email already belongs to an Operator.',
+  operatorInviteInvalid: 'This invitation link is no longer valid.',
 } as const;

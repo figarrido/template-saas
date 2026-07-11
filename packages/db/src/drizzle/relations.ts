@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { admin_audit_log, admin_users, authUsers, billing_accounts, entitlements, flag_overrides, invitations, invoices, memberships, organizations, plan_entitlements, plans, profiles, tax_documents } from "./schema";
+import { admin_audit_log, admin_users, authUsers, billing_accounts, entitlements, flag_overrides, invitations, invoices, memberships, operator_invitations, organizations, plan_entitlements, plans, profiles, tax_documents } from "./schema";
 
 export const admin_audit_logRelations = relations(admin_audit_log, ({one}) => ({
 	authUsers: one(authUsers, {
@@ -103,6 +103,13 @@ export const organizationsRelations = relations(organizations, ({many}) => ({
 	tax_documents: many(tax_documents),
 }));
 
+export const operator_invitationsRelations = relations(operator_invitations, ({one}) => ({
+	authUsers: one(authUsers, {
+		fields: [operator_invitations.invited_by],
+		references: [authUsers.id]
+	}),
+}));
+
 export const plan_entitlementsRelations = relations(plan_entitlements, ({one}) => ({
 	plan: one(plans, {
 		fields: [plan_entitlements.plan_id],
@@ -146,5 +153,6 @@ export const usersInAuthRelations = relations(authUsers, ({many}) => ({
 	}),
 	entitlements: many(entitlements),
 	flag_overrides: many(flag_overrides),
+	operator_invitations: many(operator_invitations),
 	profiles: many(profiles),
 }));

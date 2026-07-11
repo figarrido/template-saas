@@ -17,6 +17,7 @@ export const adminServer = {
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
   ADMIN_DATABASE_URL: z.string().url(),
+  OPERATOR_EMAIL_FROM: z.string().min(1).default('Operators <operators@template.test>'),
 };
 
 export const adminClient = {
@@ -35,11 +36,13 @@ export const adminSchema: SurfaceSchema = {
     SMTP_HOST: '127.0.0.1',
     SMTP_PORT: '54425',
     NEXT_PUBLIC_SITE_URL: 'https://admin.template.localhost',
+    OPERATOR_EMAIL_FROM: 'Operators <operators@template.test>',
   },
   descriptions: {
     ...sharedDescriptions,
     ADMIN_DATABASE_URL: 'Direct Postgres connection used by Drizzle. Service-role only.',
     MAIL_PROVIDER: '`smtp` in dev, `resend` in prod.',
     NEXT_PUBLIC_SITE_URL: 'Admin origin (separate from web).',
+    OPERATOR_EMAIL_FROM: 'From: address for Operator invitation emails.',
   },
 };

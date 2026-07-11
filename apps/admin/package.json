@@ -19,6 +19,7 @@
     "@supabase/supabase-js": "^2.45.0",
     "@template/auth": "workspace:*",
     "@template/billing": "workspace:*",
+    "@template/email": "workspace:*",
     "@template/db": "workspace:*",
     "@template/env": "workspace:*",
     "@template/flags": "workspace:*",

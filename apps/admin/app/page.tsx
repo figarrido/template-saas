@@ -16,9 +16,12 @@ export default async function AdminIndex() {
     <main className="mx-auto max-w-2xl p-6">
       <h1 className="text-3xl font-bold">Admin</h1>
       <p className="mt-4 text-muted-foreground">Internal admin surface.</p>
-      <div className="mt-6">
+      <div className="mt-6 flex gap-3">
         <Button asChild>
           <Link href="/organizations">Organizations</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/operators">Operators</Link>
         </Button>
       </div>
     </main>

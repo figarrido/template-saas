@@ -322,6 +322,29 @@ export const memberships = pgTable("memberships", {
 	}
 });
 
+export const operator_invitations = pgTable("operator_invitations", {
+	operator_invitation_id: uuid().default(sql`uuid_generate_v7()`).primaryKey().notNull(),
+	email: text().notNull(),
+	token_hash: text().notNull(),
+	status: invitation_status().default('pending').notNull(),
+	invited_by: uuid(),
+	expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+	accepted_at: timestamp({ withTimezone: true, mode: 'string' }),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => {
+	return {
+		operator_invitations_email_idx: index("operator_invitations_email_idx").using("btree", sql`lower(email)`),
+		operator_invitations_invited_by_fkey: foreignKey({
+			columns: [table.invited_by],
+			foreignColumns: [authUsers.id],
+			name: "operator_invitations_invited_by_fkey"
+		}).onDelete("set null"),
+		operator_invitations_pending_email_idx: uniqueIndex("operator_invitations_pending_email_idx").using("btree", sql`lower(email)`).where(sql`(status = 'pending')`),
+		operator_invitations_token_hash_key: unique("operator_invitations_token_hash_key").on(table.token_hash),
+	}
+});
+
 export const plan_entitlements = pgTable("plan_entitlements", {
 	plan_entitlement_id: uuid().default(sql`uuid_generate_v7()`).primaryKey().notNull(),
 	plan_id: uuid().notNull(),

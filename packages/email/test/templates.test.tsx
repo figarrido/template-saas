@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render } from '@react-email/components';
-import { InviteEmail, VerifyEmail, WelcomeEmail, PasswordResetEmail } from '../src/templates/index.js';
+import { InviteEmail, VerifyEmail, WelcomeEmail, PasswordResetEmail, OperatorInviteEmail } from '../src/templates/index.js';
 
 describe('email templates render', () => {
   it('WelcomeEmail renders the display name', async () => {
@@ -26,5 +26,16 @@ describe('email templates render', () => {
   it('PasswordResetEmail renders the reset URL', async () => {
     const html = await render(<PasswordResetEmail resetUrl="https://reset.test/x" />);
     expect(html).toContain('https://reset.test/x');
+  });
+
+  it('OperatorInviteEmail renders the inviter email and accept URL', async () => {
+    const html = await render(
+      <OperatorInviteEmail
+        inviterEmail="sam@template.test"
+        acceptUrl="https://accept.test/x"
+      />,
+    );
+    expect(html).toContain('sam@template.test');
+    expect(html).toContain('https://accept.test/x');
   });
 });

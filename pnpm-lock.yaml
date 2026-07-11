@@ -68,6 +68,9 @@ importers:
       '@template/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@template/email':
+        specifier: workspace:*
+        version: link:../../packages/email
       '@template/env':
         specifier: workspace:*
         version: link:../../packages/env

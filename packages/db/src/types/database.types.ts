@@ -277,6 +277,42 @@ export type Database = {
           },
         ]
       }
+      operator_invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          invited_by: string | null
+          operator_invitation_id: string
+          status: Database["public"]["Enums"]["invitation_status"]
+          token_hash: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at: string
+          invited_by?: string | null
+          operator_invitation_id?: string
+          status?: Database["public"]["Enums"]["invitation_status"]
+          token_hash: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          invited_by?: string | null
+          operator_invitation_id?: string
+          status?: Database["public"]["Enums"]["invitation_status"]
+          token_hash?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       invitations: {
         Row: {
           accepted_at: string | null
