@@ -15,7 +15,6 @@ const serviceSql = postgres(DATABASE_URL, { max: 4, prepare: false });
 
 // Throwaway org — isolated from the seed tenant so tests don't stomp each other.
 const ORG_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-const PLAN_ID = 'aaaabbbb-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
 const db = getServiceClient({ databaseUrl: DATABASE_URL });
 const entitlements = createEntitlements(db);
@@ -39,16 +38,21 @@ afterAll(async () => {
   await serviceSql.end({ timeout: 5 });
 });
 
+// `startsAt`/`expiresAt` are SQL fragments (e.g. serviceSql`now() - interval
+// '1 day'`), not strings: they must be inlined as SQL so `now()`/`interval`
+// evaluate on the DB clock. Passed as bound parameters they'd reach Postgres
+// as opaque text and fail to cast to timestamptz. Mirrors packages/auth's
+// integration setup (serviceSql`now()`).
 async function insertPeriod(opts: {
   source?: string;
   value?: string;
-  startsAt?: string;
-  expiresAt?: string | null;
+  startsAt?: postgres.Fragment;
+  expiresAt?: postgres.Fragment;
 }): Promise<string> {
   const source = opts.source ?? 'billing';
   const value = opts.value ?? 'true';
-  const startsAt = opts.startsAt ?? "now() - interval '1 day'";
-  const expiresAt = opts.expiresAt === undefined ? null : opts.expiresAt;
+  const startsAt = opts.startsAt ?? serviceSql`now() - interval '1 day'`;
+  const expiresAt = opts.expiresAt ?? null;
 
   const rows = await serviceSql`
     insert into public.entitlements
@@ -58,8 +62,8 @@ async function insertPeriod(opts: {
       'pro',
       ${value}::jsonb,
       ${source},
-      ${startsAt}::timestamptz,
-      ${expiresAt}::timestamptz
+      ${startsAt},
+      ${expiresAt}
     )
     returning entitlement_id
   `;
@@ -72,7 +76,7 @@ async function deleteById(id: string): Promise<void> {
 
 describe('entitlements read API — temporal window', () => {
   it('active period (starts_at past, no expiry) → has=true; list contains pro once', async () => {
-    const id = await insertPeriod({ startsAt: "now() - interval '1 day'" });
+    const id = await insertPeriod({ startsAt: serviceSql`now() - interval '1 day'` });
     try {
       expect(await entitlements.has(ORG_ID, 'pro')).toBe(true);
       const list = await entitlements.list(ORG_ID);
@@ -83,7 +87,7 @@ describe('entitlements read API — temporal window', () => {
   });
 
   it('future period (starts_at tomorrow) only → has=false; list omits pro', async () => {
-    const id = await insertPeriod({ startsAt: "now() + interval '1 day'" });
+    const id = await insertPeriod({ startsAt: serviceSql`now() + interval '1 day'` });
     try {
       expect(await entitlements.has(ORG_ID, 'pro')).toBe(false);
       const list = await entitlements.list(ORG_ID);
@@ -94,7 +98,7 @@ describe('entitlements read API — temporal window', () => {
   });
 
   it('expired period (expires_at in past) only → has=false; list omits pro', async () => {
-    const id = await insertPeriod({ expiresAt: "now() - interval '1 hour'" });
+    const id = await insertPeriod({ expiresAt: serviceSql`now() - interval '1 hour'` });
     try {
       expect(await entitlements.has(ORG_ID, 'pro')).toBe(false);
       const list = await entitlements.list(ORG_ID);

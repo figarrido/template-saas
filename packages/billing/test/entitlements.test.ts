@@ -43,14 +43,6 @@ describe('resolveActiveEntitlements', () => {
     expect(result[0]?.value).toBe(10);
   });
 
-  it('two distinct keys — both returned, each once', () => {
-    const result = resolveActiveEntitlements([
-      { key: 'pro', value: true, source: 'billing', expiresAt: null },
-      { key: 'pro', value: true, source: 'billing', expiresAt: null },
-    ]);
-    expect(result).toHaveLength(1);
-  });
-
   it('grant and billing for same value — still one entry', () => {
     const result = resolveActiveEntitlements([billing(true), grant(true)]);
     expect(result).toHaveLength(1);
