@@ -22,17 +22,25 @@
 //                               emits PASS/FAIL. All issue pipelines run
 //                               concurrently via Promise.allSettled().
 //   Phase 3 (Gate):             A branch is mergeable only if the implementer
-//                               signaled COMPLETE, the reviewer approved, and
-//                               the verifier passed. Anything else is held
-//                               back — the branch survives on disk and the
-//                               next cycle resumes it (branch names are
-//                               deterministic per issue). Two anti-livelock
-//                               rules: an ALREADY_SATISFIED issue is closed by
-//                               the orchestrator; a COMPLETE claim with no
-//                               work to merge is parked (ready-for-agent →
-//                               needs-triage). A cycle that merges nothing,
-//                               commits nothing, and closes/parks nothing
-//                               stops the loop — its rerun would be identical.
+//                               signaled COMPLETE, the reviewer approved, the
+//                               verifier passed, AND a deterministic
+//                               test-integrity diff finds no deleted test
+//                               files or added skip/todo markers (a gamed
+//                               suite passes the verifier trivially). Anything
+//                               else is held back — the branch survives on
+//                               disk and the next cycle resumes it (branch
+//                               names are deterministic per issue). Anti-
+//                               livelock rules: an ALREADY_SATISFIED issue is
+//                               closed by the orchestrator; a COMPLETE claim
+//                               with no work to merge is parked (ready-for-
+//                               agent → needs-triage); every other held-back
+//                               cycle posts a failure-marker comment, and
+//                               MAX_ATTEMPTS such failures park the issue too
+//                               (churn — commits without merges — never trips
+//                               the zero-activity breaker below). A cycle that
+//                               merges nothing, commits nothing, and
+//                               closes/parks nothing stops the loop — its
+//                               rerun would be identical.
 //   Phase 4 (Merge):            The orchestrator itself merges each mergeable
 //                               branch into the current branch — a script, not
 //                               an agent: merging and issue-closing are
@@ -51,12 +59,20 @@
 //   pnpm sandcastle                  # defaults: 4 issues per cycle, 10 cycles
 //   pnpm sandcastle --parallel 2     # take only the top 2 issues per cycle
 //   pnpm sandcastle -p 1 -i 1        # one issue, one cycle — slow mode
+//   SANDCASTLE_MAX_TOKENS=20000000 pnpm sandcastle
+//                                    # optional token budget for the run;
+//                                    # checked at cycle boundaries only
 // (defined in package.json as "sandcastle": "tsx .sandcastle/main.mts";
 // pnpm forwards flags after the script name straight to the script)
+//
+// Every run appends to .sandcastle/RUN_LOG.md (gitignored): a header line per
+// run and one line per cycle — planned/merged/skipped/closed/held issues and
+// token usage — so an overnight run is skimmable without opening per-role logs.
 
 import * as sandcastle from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import { execFileSync, execSync } from "node:child_process";
+import { appendFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { z } from "zod";
 
@@ -86,6 +102,9 @@ type PipelineResult = {
   // existing code — the orchestrator closes the issue instead of gating it.
   alreadySatisfied?: boolean;
   note?: string;
+  // Token usage summed across every stage this pipeline ran — feeds the
+  // per-cycle run-ledger line and the optional token ceiling.
+  tokens: TokenTally;
 };
 
 // Verdict signals for the reviewer and verifier. sandbox.run() has no
@@ -262,8 +281,215 @@ function readyForAgentCount(): number {
 }
 
 // ---------------------------------------------------------------------------
+// Loop accounting: token tallies, run ledger, budget ceiling
+// ---------------------------------------------------------------------------
+
+type TokenTally = { input: number; cacheRead: number; output: number };
+
+const zeroTokens = (): TokenTally => ({ input: 0, cacheRead: 0, output: 0 });
+
+// Sum a run result's per-iteration usage into a tally. `input` folds in cache
+// WRITES (billed like input); cache READS are tracked separately — they are an
+// order of magnitude cheaper and dominate loop traffic, so folding them into
+// input would make every cycle look far more expensive than it is.
+function addTokens(
+  tally: TokenTally,
+  run: {
+    iterations: ReadonlyArray<{
+      usage?: {
+        inputTokens: number;
+        cacheCreationInputTokens: number;
+        cacheReadInputTokens: number;
+        outputTokens: number;
+      };
+    }>;
+  },
+): void {
+  for (const it of run.iterations) {
+    if (!it.usage) continue;
+    tally.input += it.usage.inputTokens + it.usage.cacheCreationInputTokens;
+    tally.cacheRead += it.usage.cacheReadInputTokens;
+    tally.output += it.usage.outputTokens;
+  }
+}
+
+function foldTokens(into: TokenTally, from: TokenTally): void {
+  into.input += from.input;
+  into.cacheRead += from.cacheRead;
+  into.output += from.output;
+}
+
+const totalTokens = (t: TokenTally) => t.input + t.cacheRead + t.output;
+
+function compact(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
+  return String(n);
+}
+
+const fmtTokens = (t: TokenTally) =>
+  `in=${compact(t.input)} cacheR=${compact(t.cacheRead)} out=${compact(t.output)}`;
+
+// One line per cycle appended to a host-local, gitignored ledger so an
+// overnight run's shape (what merged, parked, churned, cost) is skimmable in
+// seconds and /retro can ingest it — instead of reconstructing the run from
+// per-role logs after the fact.
+const RUN_LOG = "./.sandcastle/RUN_LOG.md";
+
+function runLog(line: string): void {
+  try {
+    appendFileSync(RUN_LOG, line + "\n");
+  } catch {
+    // Logging must never kill the loop.
+  }
+}
+
+// Optional token budget for the whole run (sum of input + cache-read + output
+// across every agent). 0 = unbounded. Checked at cycle boundaries only, so a
+// merge-and-verify always finishes cleanly — the ceiling stops the NEXT lap,
+// it never corrupts the current one. Without any budget the practical
+// backstop is the subscription rate limit, hit blind mid-cycle.
+const TOKEN_CEILING = Number(process.env.SANDCASTLE_MAX_TOKENS) || 0;
+
+// ---------------------------------------------------------------------------
+// Per-issue attempt cap and test-integrity gate
+// ---------------------------------------------------------------------------
+
+// Bounded retry, then escalate to a human (12-factor agents, factor 9): a
+// churning issue — new commits every cycle, but review or verify keeps
+// failing — never trips the no-progress breaker (which only sees zero-commit
+// cycles) and would otherwise be re-selected until MAX_ITERATIONS.
+const MAX_ATTEMPTS = 3;
+const FAILED_CYCLE_MARKER = "<!-- sandcastle:failed-cycle -->";
+
+// How many cycles have already failed on this issue, counted from the
+// orchestrator's own marker comments. GitHub comments are the
+// cross-invocation store — the same reasoning as deterministic branch names:
+// state that must survive the process lives outside it.
+function failedCycleCount(issueId: string): number {
+  try {
+    const out = execFileSync(
+      "gh",
+      [
+        "issue",
+        "view",
+        issueId,
+        "--json",
+        "comments",
+        "--jq",
+        `[.comments[].body | select(startswith("${FAILED_CYCLE_MARKER}"))] | length`,
+      ],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    ).trim();
+    return Number(out) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+// Swap ready-for-agent → needs-triage and explain why, so the planner's label
+// filter stops selecting the issue and a human triages with the failure trail
+// already on the issue.
+function parkIssue(issueId: string, body: string): boolean {
+  try {
+    execFileSync(
+      "gh",
+      [
+        "issue",
+        "edit",
+        issueId,
+        "--remove-label",
+        "ready-for-agent",
+        "--add-label",
+        "needs-triage",
+      ],
+      { stdio: "pipe" },
+    );
+    execFileSync("gh", ["issue", "comment", issueId, "--body", body], {
+      stdio: "pipe",
+    });
+    return true;
+  } catch {
+    console.error(
+      `  ⚠ #${issueId} should be parked but the label swap failed — do it ` +
+        `manually (create the label first if missing): ` +
+        `gh issue edit ${issueId} --remove-label ready-for-agent --add-label needs-triage`,
+    );
+    return false;
+  }
+}
+
+// Test files by this repo's conventions: *.test.* / *.spec.* / __tests__/ and
+// test(s)/ directories.
+const TEST_FILE_RE = /(^|\/)(__tests__|tests?)\/|\.(test|spec)\.[cm]?[jt]sx?$/;
+// Added lines that disable tests: it.skip / describe.skip / test.todo / xit(…
+const SKIP_MARKER_RE =
+  /\b(?:it|test|describe)\s*\.\s*(?:skip|todo)\s*\(|\bx(?:it|test|describe)\s*\(/;
+
+// The documented gaming failure mode: an implementer that quietly deletes or
+// skips tests it couldn't fix produces a branch where typecheck+tests pass —
+// the verifier re-runs the suite but cannot see what's missing from it. This
+// is the deterministic guard: diff the branch against its merge base
+// (HEAD...branch) and refuse to merge when test files were deleted or
+// skip/todo markers were added. Renames don't count (-M). A violation holds
+// the branch back and counts as a failed cycle, so the attempt cap eventually
+// escalates repeat offenders to a human.
+function testIntegrityViolations(branch: string): string[] {
+  const violations: string[] = [];
+  try {
+    const status = execFileSync(
+      "git",
+      ["diff", "--name-status", "-M", `HEAD...${branch}`],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+        maxBuffer: 64 * 1024 * 1024,
+      },
+    );
+    for (const line of status.split("\n")) {
+      const [code, path] = line.split("\t");
+      if (code?.startsWith("D") && path && TEST_FILE_RE.test(path)) {
+        violations.push(`deleted test file: ${path}`);
+      }
+    }
+    const diff = execFileSync("git", ["diff", "-M", `HEAD...${branch}`], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    let file = "";
+    for (const line of diff.split("\n")) {
+      if (line.startsWith("+++ b/")) {
+        file = line.slice(6);
+      } else if (
+        file &&
+        TEST_FILE_RE.test(file) &&
+        line.startsWith("+") &&
+        !line.startsWith("+++") &&
+        SKIP_MARKER_RE.test(line)
+      ) {
+        violations.push(
+          `skip/todo added in ${file}: ${line.trim().slice(0, 100)}`,
+        );
+      }
+    }
+  } catch {
+    // Branch missing or git failed — nothing checkable here; the
+    // ahead-of-base gate already excludes branches that don't exist.
+  }
+  return violations;
+}
+
+// ---------------------------------------------------------------------------
 // Main loop
 // ---------------------------------------------------------------------------
+
+const runTokens = zeroTokens();
+runLog(
+  `\n## Run ${new Date().toISOString()} — max ${MAX_ITERATIONS} cycles, ` +
+    `parallel ${MAX_PARALLEL}` +
+    (TOKEN_CEILING > 0 ? `, token ceiling ${compact(TOKEN_CEILING)}` : ""),
+);
 
 for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   console.log(`\n=== Iteration ${iteration}/${MAX_ITERATIONS} ===\n`);
@@ -272,8 +498,11 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
 
   if (readyForAgentCount() === 0) {
     console.log("No open ready-for-agent issues — nothing to plan. Exiting.");
+    runLog(`- run ended (cycle ${iteration}): backlog empty`);
     break;
   }
+
+  const cycleTokens = zeroTokens();
 
   // -------------------------------------------------------------------------
   // Phase 1: Plan
@@ -304,12 +533,16 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     output: sandcastle.Output.object({ tag: "plan", schema: planSchema }),
   });
 
+  addTokens(cycleTokens, plan);
+
   const planned = plan.output.issues;
   const issues = planned.slice(0, MAX_PARALLEL);
 
   if (issues.length === 0) {
     // No unblocked work — either everything is done or everything is blocked.
     console.log("No unblocked issues to work on. Exiting.");
+    foldTokens(runTokens, cycleTokens);
+    runLog(`- run ended (cycle ${iteration}): planner found no unblocked issues`);
     break;
   }
 
@@ -347,6 +580,8 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
         hooks: installHooks,
       });
 
+      const tokens = zeroTokens();
+
       try {
         // The architect (opus) explores for reuse — code graph first — and
         // posts an executable design as an issue comment. On resumed branches
@@ -369,6 +604,8 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
           ],
         });
 
+        addTokens(tokens, architect);
+
         if (architect.completionSignal !== ARCHITECT_VERDICTS.ready) {
           // BLOCKED (the architect commented and re-labeled the issue) or no
           // verdict at all — either way there is no design to implement.
@@ -378,6 +615,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
             implementComplete: false,
             reviewApproved: false,
             checksPassed: false,
+            tokens,
             note:
               architect.completionSignal === ARCHITECT_VERDICTS.blocked
                 ? "architect blocked the issue — needs human input (see issue comment)"
@@ -406,6 +644,8 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
           ],
         });
 
+        addTokens(tokens, implement);
+
         if (
           implement.completionSignal === IMPLEMENT_SIGNALS.alreadySatisfied
         ) {
@@ -420,6 +660,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
             reviewApproved: false,
             checksPassed: false,
             alreadySatisfied: true,
+            tokens,
             note: "acceptance criteria already met by existing code (see issue comment)",
           };
         }
@@ -447,6 +688,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
             implementComplete,
             reviewApproved: false,
             checksPassed: false,
+            tokens,
             note:
               implement.completionSignal === IMPLEMENT_SIGNALS.needsArchitect
                 ? "implementer requested a revised design (NEEDS_ARCHITECT)"
@@ -488,6 +730,9 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
           completionSignal: [VERIFY_VERDICTS.pass, VERIFY_VERDICTS.fail],
         });
 
+        addTokens(tokens, review);
+        addTokens(tokens, verify);
+
         // Merge commits from both runs so the merge phase sees all of them.
         // Each sandbox.run() only returns commits from its own run. (The
         // verifier is read-only and never commits.)
@@ -497,6 +742,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
           implementComplete,
           reviewApproved: review.completionSignal === REVIEW_VERDICTS.approve,
           checksPassed: verify.completionSignal === VERIFY_VERDICTS.pass,
+          tokens,
         };
       } finally {
         await sandbox.close();
@@ -516,6 +762,13 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   const results = settled.flatMap((outcome) =>
     outcome.status === "fulfilled" ? [outcome.value] : [],
   );
+
+  // Rejected pipelines lose their usage numbers (the throw discards the
+  // partial tally) — the ledger undercounts crashed cycles slightly rather
+  // than complicating every stage with try/finally accounting.
+  for (const r of results) {
+    foldTokens(cycleTokens, r.tokens);
+  }
 
   // Issues the implementer proved already satisfied get closed here on the
   // host, like merge+close below: deterministic code, not a prompt
@@ -552,12 +805,31 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // under their deterministic name, and the next cycle's implementer resumes
   // them (the issue stays open, so the planner re-selects it).
   // -------------------------------------------------------------------------
+
+  // Deterministic test-integrity check, run only on branches that would
+  // otherwise merge (two git diffs each — cheap). See
+  // testIntegrityViolations() for the failure mode this guards.
+  const integrityViolations = new Map<string, string[]>();
+  for (const r of results) {
+    if (
+      !r.alreadySatisfied &&
+      r.implementComplete &&
+      r.reviewApproved &&
+      r.checksPassed &&
+      branchIsAheadOfBase(r.issue.branch)
+    ) {
+      const v = testIntegrityViolations(r.issue.branch);
+      if (v.length > 0) integrityViolations.set(r.issue.branch, v);
+    }
+  }
+
   const mergeable = results.filter(
     (r) =>
       branchIsAheadOfBase(r.issue.branch) &&
       r.implementComplete &&
       r.reviewApproved &&
-      r.checksPassed,
+      r.checksPassed &&
+      !integrityViolations.has(r.issue.branch),
   );
 
   // Everything that didn't pass the gate gets reported — including pipelines
@@ -569,16 +841,19 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   );
 
   let parked = 0;
+  const heldSummaries: string[] = [];
   for (const r of heldBack) {
-    const reasons =
-      r.note ??
-      [
-        !r.implementComplete && "implementer did not signal COMPLETE",
-        !r.reviewApproved && "reviewer did not approve",
-        !r.checksPassed && "typecheck/tests did not pass",
-      ]
-        .filter(Boolean)
-        .join("; ");
+    const violations = integrityViolations.get(r.issue.branch);
+    const reasons = violations
+      ? `test-integrity check failed: ${violations.join("; ")}`
+      : (r.note ??
+        [
+          !r.implementComplete && "implementer did not signal COMPLETE",
+          !r.reviewApproved && "reviewer did not approve",
+          !r.checksPassed && "typecheck/tests did not pass",
+        ]
+          .filter(Boolean)
+          .join("; "));
     const suffix = branchIsAheadOfBase(r.issue.branch)
       ? " — branch kept for the next cycle"
       : "";
@@ -588,46 +863,75 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     // branch can never become ahead of base, so the gate will hold it back on
     // every future cycle too (the issue-22 failure mode — a parent/no-op
     // issue). ALREADY_SATISFIED is the well-behaved exit for that situation;
-    // this is the backstop when the implementer says COMPLETE instead. Park
-    // the issue for a human: swap ready-for-agent for needs-triage so the
-    // planner's label filter stops selecting it.
+    // this is the backstop when the implementer says COMPLETE instead.
     if (r.implementComplete && !branchIsAheadOfBase(r.issue.branch)) {
-      try {
-        execFileSync(
-          "gh",
-          [
-            "issue",
-            "edit",
-            r.issue.id,
-            "--remove-label",
-            "ready-for-agent",
-            "--add-label",
-            "needs-triage",
-          ],
-          { stdio: "pipe" },
-        );
-        execFileSync(
-          "gh",
-          [
-            "issue",
-            "comment",
-            r.issue.id,
-            "--body",
-            "Parked by Sandcastle: the implementer signaled COMPLETE but produced no commits and the branch has no work to merge — likely already satisfied by existing code (possibly via child issues) or mis-specified. A human should close or re-spec it; re-add `ready-for-agent` to hand it back to the agents.",
-          ],
-          { stdio: "pipe" },
-        );
+      if (
+        parkIssue(
+          r.issue.id,
+          "Parked by Sandcastle: the implementer signaled COMPLETE but produced no commits and the branch has no work to merge — likely already satisfied by existing code (possibly via child issues) or mis-specified. A human should close or re-spec it; re-add `ready-for-agent` to hand it back to the agents.",
+        )
+      ) {
         parked++;
         console.log(
           `  ⏸ #${r.issue.id} parked (ready-for-agent → needs-triage) — COMPLETE with no work to merge`,
         );
-      } catch {
-        console.error(
-          `  ⚠ #${r.issue.id} should be parked but the label swap failed — ` +
-            `do it manually (create the label first if missing): ` +
-            `gh issue edit ${r.issue.id} --remove-label ready-for-agent --add-label needs-triage`,
+      }
+      heldSummaries.push(`#${r.issue.id} parked (no-op COMPLETE)`);
+      continue;
+    }
+
+    // Architect-BLOCKED issues already left the planner's pool via the
+    // needs-info label swap the architect itself performs — no counter needed.
+    if (r.note?.startsWith("architect blocked")) {
+      heldSummaries.push(`#${r.issue.id} blocked by architect`);
+      continue;
+    }
+
+    // Attempt accounting: every other held-back result is a failed cycle.
+    // Record the deterministic marker comment (the trail the next cycle's
+    // agents and the parking human both read), and on the Nth strike park the
+    // issue — bounded retry then escalate, at the task level. Without this an
+    // issue that commits every cycle but keeps failing review/verify churns
+    // until MAX_ITERATIONS: the no-progress breaker only sees zero-commit
+    // cycles.
+    let attempts = 0;
+    try {
+      execFileSync(
+        "gh",
+        [
+          "issue",
+          "comment",
+          r.issue.id,
+          "--body",
+          `${FAILED_CYCLE_MARKER}\nSandcastle failed cycle: ${reasons}`,
+        ],
+        { stdio: "pipe" },
+      );
+      attempts = failedCycleCount(r.issue.id);
+    } catch {
+      // Comment failed (network, auth) — skip counting this cycle rather
+      // than guessing; the branch itself is unaffected.
+    }
+    if (attempts >= MAX_ATTEMPTS) {
+      if (
+        parkIssue(
+          r.issue.id,
+          `Parked by Sandcastle after ${attempts} failed cycles (last: ${reasons}). ` +
+            `The branch \`${r.issue.branch}\` is kept. A human should read the failure ` +
+            "trail above and either fix the blocker or re-spec; re-add `ready-for-agent` " +
+            "to hand it back to the agents.",
+        )
+      ) {
+        parked++;
+        console.log(
+          `  ⏸ #${r.issue.id} parked — ${attempts} failed cycles (cap ${MAX_ATTEMPTS})`,
         );
       }
+      heldSummaries.push(`#${r.issue.id} parked (${attempts} failed cycles)`);
+    } else {
+      heldSummaries.push(
+        `#${r.issue.id} held, attempt ${attempts}/${MAX_ATTEMPTS} (${reasons.slice(0, 80)})`,
+      );
     }
   }
 
@@ -637,6 +941,40 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   for (const r of mergeable) {
     console.log(`  ${r.issue.branch}`);
   }
+
+  // Everything an agent could bill for in this cycle has run by now.
+  foldTokens(runTokens, cycleTokens);
+
+  // One ledger line per cycle, whatever way the cycle ends.
+  const cycleLine = (
+    status: string,
+    mergedIds: string[] = [],
+    skippedIds: string[] = [],
+  ) =>
+    runLog(
+      `- ${new Date().toISOString()} cycle ${iteration}/${MAX_ITERATIONS} | ` +
+        `planned [${issues.map((i) => i.id).join(",")}] | ` +
+        `merged [${mergedIds.join(",")}] | skipped [${skippedIds.join(",")}] | ` +
+        `closed [${alreadySatisfied.map((r) => r.issue.id).join(",")}] | ` +
+        `held: ${heldSummaries.join("; ") || "none"} | ` +
+        `tokens ${fmtTokens(cycleTokens)} | run-total ${compact(totalTokens(runTokens))} | ` +
+        status,
+    );
+
+  // Budget check, cycle-boundary only (see TOKEN_CEILING note above).
+  const ceilingHit = (): boolean => {
+    if (TOKEN_CEILING > 0 && totalTokens(runTokens) >= TOKEN_CEILING) {
+      console.log(
+        `Token ceiling reached (${compact(totalTokens(runTokens))} of ` +
+          `${compact(TOKEN_CEILING)}) — stopping at the cycle boundary.`,
+      );
+      runLog(
+        `- run ended (cycle ${iteration}): token ceiling ${compact(TOKEN_CEILING)} reached`,
+      );
+      return true;
+    }
+    return false;
+  };
 
   if (mergeable.length === 0) {
     // Did this cycle change anything the next cycle would see? New commits
@@ -656,11 +994,14 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
           "identical; see the held-back reasons above and resolve them " +
           "before re-running.",
       );
+      cycleLine("STOPPED: no-progress breaker");
       break;
     }
     // All agents ran but nothing passed the gate — nothing to merge this
     // cycle. Held-back branches resume next iteration.
     console.log("No branches passed the gate. Nothing to merge.");
+    cycleLine("nothing mergeable");
+    if (ceilingHit()) break;
     continue;
   }
 
@@ -739,6 +1080,12 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
 
   if (merged.length === 0) {
     // Nothing landed on the target branch, so there is nothing new to verify.
+    cycleLine(
+      "all merges conflicted — resolved in-branch next cycle",
+      [],
+      skipped.map((i) => i.id),
+    );
+    if (ceilingHit()) break;
     continue;
   }
 
@@ -761,10 +1108,24 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
         "doesn't build on a broken base — inspect the merge, fix or revert, " +
         "then re-run.",
     );
+    cycleLine(
+      "ABORTED: merged result RED on host",
+      merged.map((i) => i.id),
+      skipped.map((i) => i.id),
+    );
     process.exit(1);
   }
 
   console.log("\nMerged result verified.");
+  cycleLine(
+    "ok",
+    merged.map((i) => i.id),
+    skipped.map((i) => i.id),
+  );
+  if (ceilingHit()) break;
 }
 
+runLog(
+  `- run finished ${new Date().toISOString()} — total ${compact(totalTokens(runTokens))} tokens`,
+);
 console.log("\nAll done.");

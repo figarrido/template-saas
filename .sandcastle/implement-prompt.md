@@ -80,6 +80,8 @@ Output <promise>COMPLETE</promise> ONLY when all of the following are true:
 - `pnpm typecheck` and `pnpm test` pass
 - All work is committed
 
+Never delete a failing test, mark it `.skip`/`.todo`, or otherwise disable it to make checks pass. The orchestrator diff-checks the branch for deleted test files and added skip markers and will refuse to merge, recording the cycle as failed. If a test is genuinely wrong, fix it and explain why in your issue comment.
+
 Output <promise>NEEDS_ARCHITECT</promise> when the design cannot be executed as written — it names code that doesn't exist, its approach cannot pass the tests, or the issue's acceptance criteria aren't covered by it. Do NOT improvise a redesign. Instead: commit any safe partial work, comment on the issue describing exactly where the design breaks down (quote the design section and the reality that contradicts it), then emit the signal so the architect revises the design next cycle.
 
 Output <promise>ALREADY_SATISFIED</promise> when the issue's acceptance criteria are already met by the code as it stands and there is nothing left to implement — typically a parent/tracking issue whose work landed through child issues, or work that another branch already delivered. Verify, don't assume: run the checks or tests that prove each acceptance criterion. Then leave a comment on the issue citing the evidence (the files, the tests, the commands you ran and their results) so a human can audit the claim, and emit the signal — the orchestrator will close the issue. Never use this signal in a run where you changed or committed anything; that is COMPLETE.
