@@ -122,13 +122,73 @@ function sortTableBlockMembers(blockText: string): string {
   return prefix + members.map(m => m.text).join('') + suffix;
 }
 
+// Canonicalise every `pgPolicy(...)` to a minimal, stable shape:
+//   pgPolicy("name", { as: …, for: …, to: [ … ] })
+// dropping the `using` / `withCheck` SQL predicates. drizzle-kit 0.31's policy
+// introspection is non-deterministic about those expressions — it races its
+// parallel catalog fetches and sometimes emits them, sometimes not (and with
+// varying trailing whitespace), which made `db:introspect:check` flap between
+// pass and false drift for identical inputs. The predicates are descriptive
+// only here — RLS is defined in raw-SQL migrations, not drizzle-kit migrations
+// — and their real behaviour is covered by the RLS suite (`test:rls`).
+// Comparing structure (command + roles), not the volatile expression text,
+// makes the drift check deterministic.
+function canonicalizePolicies(schema: string): string {
+  return schema.replace(
+    /pgPolicy\(\s*"([^"]+)"\s*,\s*\{([\s\S]*?)\}\s*\)/g,
+    (_full, name: string, body: string) => {
+      const pick = (re: RegExp) => re.exec(body)?.[1];
+      const asVal = pick(/\bas:\s*"([^"]+)"/);
+      const forVal = pick(/\bfor:\s*"([^"]+)"/);
+      const toVal = pick(/\bto:\s*(\[[^\]]*\])/);
+      const parts: string[] = [];
+      if (asVal) parts.push(`as: "${asVal}"`);
+      if (forVal) parts.push(`for: "${forVal}"`);
+      if (toVal) parts.push(`to: ${toVal}`);
+      return `pgPolicy("${name}", { ${parts.join(', ')} })`;
+    },
+  );
+}
+
+// Sort the members of an array-form table config `(table) => [ … ]`. drizzle-kit
+// 0.31 switched from the `return { … }` object form (handled by
+// sortTableBlockMembers) to this array form, and emits it in Postgres OID order
+// — which differs between a fresh container (CI) and a reset one (local), so
+// index / foreignKey / pgPolicy entries flap position. Sort by (name, text) for
+// determinism. Returns null when the block is not array form so the caller can
+// fall back to the legacy object-form sort.
+function sortTableArrayMembers(blockText: string): string | null {
+  const openTok = '(table) => [';
+  const openIdx = blockText.indexOf(openTok);
+  if (openIdx === -1) return null;
+  const contentStart = openIdx + openTok.length;
+  const closeIdx = blockText.lastIndexOf('\n]);');
+  if (closeIdx <= contentStart) return null;
+
+  const prefix = blockText.slice(0, contentStart);
+  const content = blockText.slice(contentStart, closeIdx);
+  const suffix = blockText.slice(closeIdx);
+
+  // Elements are indented one tab; their nested lines use more tabs, so split
+  // only at `\n\t` boundaries NOT followed by another tab.
+  const chunks = content.split(/(?=\n\t(?!\t))/).filter(c => c.trim().length > 0);
+  if (chunks.length <= 1) return blockText;
+
+  const keyOf = (t: string) => `${/"([^"]+)"/.exec(t)?.[1] ?? ''} ${t}`;
+  chunks.sort((a, b) => keyOf(a).localeCompare(keyOf(b)));
+  return prefix + chunks.join('') + suffix;
+}
+
 function sortSchemaExports(schema: string): string {
   const first = /^export const \w+ = pgTable\(/m.exec(schema);
   if (!first) return schema;
   const header = schema.slice(0, first.index);
   const body = schema.slice(first.index);
   const blocks = extractExportBlocks(body, 'pgTable');
-  const normalised = blocks.map(b => ({ ...b, text: sortTableBlockMembers(b.text) }));
+  const normalised = blocks.map(b => ({
+    ...b,
+    text: sortTableArrayMembers(b.text) ?? sortTableBlockMembers(b.text),
+  }));
   const sorted = topoSortBlocks(normalised);
   return header + sorted.map(b => b.text).join('\n\n') + '\n';
 }
@@ -215,6 +275,10 @@ export const authUsers = authSchema.table("users", {
     /\bforeignColumns:\s*\[\s*users\.id\s*\]/g,
     'foreignColumns: [authUsers.id]',
   );
+
+  // 3b. Canonicalise pgPolicy(...) — drop the volatile using/withCheck
+  //     predicates drizzle-kit 0.31 introspects non-deterministically.
+  schema = canonicalizePolicies(schema);
 
   // 4. Sort pgTable blocks (topological + alphabetical) for determinism.
   schema = sortSchemaExports(schema);

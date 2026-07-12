@@ -25,12 +25,12 @@ export const admin_audit_log = pgTable("admin_audit_log", {
 }, (table) => [
 	index("admin_audit_log_action_idx").using("btree", table.action.asc().nullsLast().op("text_ops")),
 	index("admin_audit_log_actor_idx").using("btree", table.actor_user_id.asc().nullsLast().op("uuid_ops")),
-	index("admin_audit_log_created_at_idx").using("btree", table.created_at.desc().nullsFirst().op("timestamptz_ops")),
 	foreignKey({
 			columns: [table.actor_user_id],
 			foreignColumns: [authUsers.id],
 			name: "admin_audit_log_actor_user_id_fkey"
 		}).onDelete("restrict"),
+	index("admin_audit_log_created_at_idx").using("btree", table.created_at.desc().nullsFirst().op("timestamptz_ops")),
 ]);
 
 export const admin_recovery_codes = pgTable("admin_recovery_codes", {
@@ -42,12 +42,12 @@ export const admin_recovery_codes = pgTable("admin_recovery_codes", {
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	index("admin_recovery_codes_unused_idx").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")).where(sql`(used_at IS NULL)`),
+	unique("admin_recovery_codes_user_id_code_hash_key").on(table.user_id, table.code_hash),
 	foreignKey({
 			columns: [table.user_id],
 			foreignColumns: [authUsers.id],
 			name: "admin_recovery_codes_user_id_fkey"
 		}).onDelete("cascade"),
-	unique("admin_recovery_codes_user_id_code_hash_key").on(table.user_id, table.code_hash),
 ]);
 
 export const admin_users = pgTable("admin_users", {
@@ -82,12 +82,12 @@ export const operator_invitations = pgTable("operator_invitations", {
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	index("operator_invitations_email_idx").using("btree", sql`lower(email)`),
-	uniqueIndex("operator_invitations_pending_email_idx").using("btree", sql`lower(email)`).where(sql`(status = 'pending'::invitation_status)`),
 	foreignKey({
 			columns: [table.invited_by],
 			foreignColumns: [authUsers.id],
 			name: "operator_invitations_invited_by_fkey"
 		}).onDelete("set null"),
+	uniqueIndex("operator_invitations_pending_email_idx").using("btree", sql`lower(email)`).where(sql`(status = 'pending'::invitation_status)`),
 	unique("operator_invitations_token_hash_key").on(table.token_hash),
 ]);
 
@@ -98,10 +98,10 @@ export const organizations = pgTable("organizations", {
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
-	unique("organizations_slug_key").on(table.slug),
-	pgPolicy("organizations_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`is_member_of(organization_id)` }),
-	pgPolicy("organizations_update", { as: "permissive", for: "update", to: ["authenticated"] }),
 	pgPolicy("organizations_no_client_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("organizations_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+	unique("organizations_slug_key").on(table.slug),
+	pgPolicy("organizations_update", { as: "permissive", for: "update", to: ["authenticated"] }),
 ]);
 
 export const billing_accounts = pgTable("billing_accounts", {
@@ -115,14 +115,14 @@ export const billing_accounts = pgTable("billing_accounts", {
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
-	index("billing_accounts_provider_customer_idx").using("btree", table.provider.asc().nullsLast().op("text_ops"), table.external_customer_id.asc().nullsLast().op("text_ops")),
 	foreignKey({
 			columns: [table.organization_id],
 			foreignColumns: [organizations.organization_id],
 			name: "billing_accounts_organization_id_fkey"
 		}).onDelete("cascade"),
 	unique("billing_accounts_organization_id_provider_key").on(table.organization_id, table.provider),
-	pgPolicy("billing_accounts_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`is_org_admin(organization_id)` }),
+	index("billing_accounts_provider_customer_idx").using("btree", table.provider.asc().nullsLast().op("text_ops"), table.external_customer_id.asc().nullsLast().op("text_ops")),
+	pgPolicy("billing_accounts_select", { as: "permissive", for: "select", to: ["authenticated"] }),
 ]);
 
 export const invoices = pgTable("invoices", {
@@ -143,8 +143,6 @@ export const invoices = pgTable("invoices", {
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
-	index("invoices_organization_id_idx").using("btree", table.organization_id.asc().nullsLast().op("uuid_ops")),
-	index("invoices_status_idx").using("btree", table.status.asc().nullsLast().op("enum_ops")),
 	foreignKey({
 			columns: [table.billing_account_id],
 			foreignColumns: [billing_accounts.billing_account_id],
@@ -155,8 +153,10 @@ export const invoices = pgTable("invoices", {
 			foreignColumns: [organizations.organization_id],
 			name: "invoices_organization_id_fkey"
 		}).onDelete("cascade"),
+	index("invoices_organization_id_idx").using("btree", table.organization_id.asc().nullsLast().op("uuid_ops")),
 	unique("invoices_provider_external_invoice_id_key").on(table.provider, table.external_invoice_id),
-	pgPolicy("invoices_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`is_org_admin(organization_id)` }),
+	pgPolicy("invoices_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+	index("invoices_status_idx").using("btree", table.status.asc().nullsLast().op("enum_ops")),
 ]);
 
 export const plans = pgTable("plans", {
@@ -168,8 +168,8 @@ export const plans = pgTable("plans", {
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
+	pgPolicy("plans_select", { as: "permissive", for: "select", to: ["authenticated"] }),
 	unique("plans_slug_key").on(table.slug),
-	pgPolicy("plans_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`is_active` }),
 ]);
 
 export const entitlements = pgTable("entitlements", {
@@ -186,24 +186,24 @@ export const entitlements = pgTable("entitlements", {
 	starts_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	granted_by: uuid(),
 }, (table) => [
-	index("entitlements_org_key_expires_idx").using("btree", table.organization_id.asc().nullsLast().op("timestamptz_ops"), table.key.asc().nullsLast().op("uuid_ops"), table.expires_at.asc().nullsLast().op("enum_ops")),
-	index("entitlements_organization_id_idx").using("btree", table.organization_id.asc().nullsLast().op("uuid_ops")),
 	foreignKey({
 			columns: [table.granted_by],
 			foreignColumns: [authUsers.id],
 			name: "entitlements_granted_by_fkey"
 		}).onDelete("set null"),
+	index("entitlements_org_key_expires_idx").using("btree", table.organization_id.asc().nullsLast().op("timestamptz_ops"), table.key.asc().nullsLast().op("uuid_ops"), table.expires_at.asc().nullsLast().op("enum_ops")),
 	foreignKey({
 			columns: [table.organization_id],
 			foreignColumns: [organizations.organization_id],
 			name: "entitlements_organization_id_fkey"
 		}).onDelete("cascade"),
+	index("entitlements_organization_id_idx").using("btree", table.organization_id.asc().nullsLast().op("uuid_ops")),
 	foreignKey({
 			columns: [table.plan_id],
 			foreignColumns: [plans.plan_id],
 			name: "entitlements_plan_id_fkey"
 		}).onDelete("set null"),
-	pgPolicy("entitlements_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`is_member_of(organization_id)` }),
+	pgPolicy("entitlements_select", { as: "permissive", for: "select", to: ["authenticated"] }),
 ]);
 
 export const plan_entitlements = pgTable("plan_entitlements", {
@@ -229,13 +229,13 @@ export const profiles = pgTable("profiles", {
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
+	pgPolicy("profiles_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+	pgPolicy("profiles_update_self", { as: "permissive", for: "update", to: ["authenticated"] }),
 	foreignKey({
 			columns: [table.user_id],
 			foreignColumns: [authUsers.id],
 			name: "profiles_user_id_fkey"
 		}).onDelete("cascade"),
-	pgPolicy("profiles_update_self", { as: "permissive", for: "update", to: ["authenticated"], using: sql`(user_id = ( SELECT auth.uid() AS uid))`, withCheck: sql`(user_id = ( SELECT auth.uid() AS uid))`  }),
-	pgPolicy("profiles_select", { as: "permissive", for: "select", to: ["authenticated"] }),
 ]);
 
 export const flag_overrides = pgTable("flag_overrides", {
@@ -250,10 +250,11 @@ export const flag_overrides = pgTable("flag_overrides", {
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
+	pgPolicy("flag_overrides_admin_only", { as: "permissive", for: "select", to: ["authenticated"] }),
+	check("flag_overrides_check", sql`((organization_id IS NULL) AND (user_id IS NULL)) OR ((organization_id IS NOT NULL) AND (user_id IS NULL)) OR ((organization_id IS NULL) AND (user_id IS NOT NULL))`),
 	index("flag_overrides_flag_key_idx").using("btree", table.flag_key.asc().nullsLast().op("text_ops")),
 	uniqueIndex("flag_overrides_global_unique").using("btree", table.flag_key.asc().nullsLast().op("text_ops")).where(sql`((organization_id IS NULL) AND (user_id IS NULL))`),
 	uniqueIndex("flag_overrides_org_unique").using("btree", table.flag_key.asc().nullsLast().op("text_ops"), table.organization_id.asc().nullsLast().op("uuid_ops")).where(sql`(organization_id IS NOT NULL)`),
-	uniqueIndex("flag_overrides_user_unique").using("btree", table.flag_key.asc().nullsLast().op("text_ops"), table.user_id.asc().nullsLast().op("text_ops")).where(sql`(user_id IS NOT NULL)`),
 	foreignKey({
 			columns: [table.organization_id],
 			foreignColumns: [organizations.organization_id],
@@ -269,10 +270,7 @@ export const flag_overrides = pgTable("flag_overrides", {
 			foreignColumns: [profiles.user_id],
 			name: "flag_overrides_user_id_fkey"
 		}).onDelete("cascade"),
-	pgPolicy("flag_overrides_admin_only", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(EXISTS ( SELECT 1
-   FROM admin_users
-  WHERE ((admin_users.user_id = ( SELECT auth.uid() AS uid)) AND (admin_users.revoked_at IS NULL))))` }),
-	check("flag_overrides_check", sql`((organization_id IS NULL) AND (user_id IS NULL)) OR ((organization_id IS NOT NULL) AND (user_id IS NULL)) OR ((organization_id IS NULL) AND (user_id IS NOT NULL))`),
+	uniqueIndex("flag_overrides_user_unique").using("btree", table.flag_key.asc().nullsLast().op("text_ops"), table.user_id.asc().nullsLast().op("text_ops")).where(sql`(user_id IS NOT NULL)`),
 ]);
 
 export const invitations = pgTable("invitations", {
@@ -288,24 +286,24 @@ export const invitations = pgTable("invitations", {
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
+	pgPolicy("invitations_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
 	index("invitations_email_idx").using("btree", sql`lower(email)`),
-	index("invitations_organization_id_idx").using("btree", table.organization_id.asc().nullsLast().op("uuid_ops")),
+	pgPolicy("invitations_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
 	foreignKey({
 			columns: [table.invited_by],
 			foreignColumns: [profiles.user_id],
 			name: "invitations_invited_by_fkey"
 		}).onDelete("set null"),
+	unique("invitations_organization_id_email_status_key").on(table.organization_id, table.email, table.status),
 	foreignKey({
 			columns: [table.organization_id],
 			foreignColumns: [organizations.organization_id],
 			name: "invitations_organization_id_fkey"
 		}).onDelete("cascade"),
-	unique("invitations_organization_id_email_status_key").on(table.organization_id, table.email, table.status),
+	index("invitations_organization_id_idx").using("btree", table.organization_id.asc().nullsLast().op("uuid_ops")),
+	pgPolicy("invitations_select", { as: "permissive", for: "select", to: ["authenticated"] }),
 	unique("invitations_token_key").on(table.token),
-	pgPolicy("invitations_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`is_org_admin(organization_id)` }),
-	pgPolicy("invitations_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
 	pgPolicy("invitations_update", { as: "permissive", for: "update", to: ["authenticated"] }),
-	pgPolicy("invitations_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
 ]);
 
 export const memberships = pgTable("memberships", {
@@ -316,23 +314,23 @@ export const memberships = pgTable("memberships", {
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
-	index("memberships_organization_id_idx").using("btree", table.organization_id.asc().nullsLast().op("uuid_ops")),
-	index("memberships_user_id_idx").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")),
+	pgPolicy("memberships_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+	pgPolicy("memberships_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
 	foreignKey({
 			columns: [table.organization_id],
 			foreignColumns: [organizations.organization_id],
 			name: "memberships_organization_id_fkey"
 		}).onDelete("cascade"),
+	index("memberships_organization_id_idx").using("btree", table.organization_id.asc().nullsLast().op("uuid_ops")),
+	pgPolicy("memberships_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+	pgPolicy("memberships_update", { as: "permissive", for: "update", to: ["authenticated"] }),
 	foreignKey({
 			columns: [table.user_id],
 			foreignColumns: [profiles.user_id],
 			name: "memberships_user_id_fkey"
 		}).onDelete("cascade"),
+	index("memberships_user_id_idx").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")),
 	unique("memberships_user_id_organization_id_key").on(table.user_id, table.organization_id),
-	pgPolicy("memberships_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`is_member_of(organization_id)` }),
-	pgPolicy("memberships_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
-	pgPolicy("memberships_update", { as: "permissive", for: "update", to: ["authenticated"] }),
-	pgPolicy("memberships_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
 ]);
 
 export const tax_documents = pgTable("tax_documents", {
@@ -349,18 +347,18 @@ export const tax_documents = pgTable("tax_documents", {
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
-	index("tax_documents_invoice_id_idx").using("btree", table.invoice_id.asc().nullsLast().op("uuid_ops")),
-	index("tax_documents_organization_id_idx").using("btree", table.organization_id.asc().nullsLast().op("uuid_ops")),
+	unique("tax_documents_emitter_external_document_id_key").on(table.emitter, table.external_document_id),
 	foreignKey({
 			columns: [table.invoice_id],
 			foreignColumns: [invoices.invoice_id],
 			name: "tax_documents_invoice_id_fkey"
 		}).onDelete("restrict"),
+	index("tax_documents_invoice_id_idx").using("btree", table.invoice_id.asc().nullsLast().op("uuid_ops")),
 	foreignKey({
 			columns: [table.organization_id],
 			foreignColumns: [organizations.organization_id],
 			name: "tax_documents_organization_id_fkey"
 		}).onDelete("cascade"),
-	unique("tax_documents_emitter_external_document_id_key").on(table.emitter, table.external_document_id),
-	pgPolicy("tax_documents_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`is_org_admin(organization_id)` }),
+	index("tax_documents_organization_id_idx").using("btree", table.organization_id.asc().nullsLast().op("uuid_ops")),
+	pgPolicy("tax_documents_select", { as: "permissive", for: "select", to: ["authenticated"] }),
 ]);
