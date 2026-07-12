@@ -248,7 +248,7 @@ A queryable tree-sitter graph of the codebase (built with [graphify](https://git
 
 ## Agent skills
 
-Per-repo configuration the engineering skills (`to-issues`, `triage`, `to-prd`, `qa`, `improve-codebase-architecture`, `diagnosing-bugs`, `tdd`) read.
+Per-repo configuration the engineering skills (`to-tickets`, `triage`, `to-spec`, `qa`, `improve-codebase-architecture`, `diagnosing-bugs`, `tdd`) read.
 
 ### Issue tracker
 
