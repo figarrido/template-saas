@@ -19,8 +19,8 @@ const DATABASE_URL =
 const serviceSql = postgres(DATABASE_URL, { max: 4, prepare: false });
 
 // Reuse the two seeded users to satisfy the admin_users → auth.users FK.
-const USER_1 = '11111111-1111-1111-1111-111111111111';
-const USER_2 = '22222222-2222-2222-2222-222222222222';
+const USER_1 = '11111111-1111-7111-8111-111111111111';
+const USER_2 = '22222222-2222-7222-8222-222222222222';
 
 const INVITE_EMAIL = 'zzz-op-revoke@example.test';
 const INVITE_TOKEN_HASH = 'zzz-op-revoke-hash';

@@ -23,9 +23,9 @@ const serviceSql = postgres(DATABASE_URL, { max: 4, prepare: false });
 const ORG_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
 // Seeded plan with a plan_entitlements → 'pro' mapping.
-const SEED_PLAN = '44444444-4444-4444-4444-444444444444';
+const SEED_PLAN = '44444444-4444-7444-8444-444444444444';
 // Seeded user to satisfy the granted_by FK.
-const USER_1 = '11111111-1111-1111-1111-111111111111';
+const USER_1 = '11111111-1111-7111-8111-111111111111';
 // Throwaway plan with no plan_entitlements (for the "empty plan rejects" case).
 const EMPTY_PLAN = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
 
