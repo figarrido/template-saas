@@ -1,7 +1,10 @@
 // Parallel Planner with Review — multi-phase orchestration loop
 //
 // This template drives a multi-phase workflow:
-//   Phase 1 (Plan):             An opus agent analyzes open issues, builds a
+//   Phase 1 (Plan):             The script first asks GitHub whether any
+//                               ready-for-agent issues exist at all (a drained
+//                               backlog must not cost a model call). Then an
+//                               opus agent analyzes open issues, builds a
 //                               dependency graph, and outputs a <plan> JSON
 //                               listing unblocked issues with branch names.
 //   Phase 2 (Design + Execute + Review):
@@ -23,7 +26,13 @@
 //                               the verifier passed. Anything else is held
 //                               back — the branch survives on disk and the
 //                               next cycle resumes it (branch names are
-//                               deterministic per issue).
+//                               deterministic per issue). Two anti-livelock
+//                               rules: an ALREADY_SATISFIED issue is closed by
+//                               the orchestrator; a COMPLETE claim with no
+//                               work to merge is parked (ready-for-agent →
+//                               needs-triage). A cycle that merges nothing,
+//                               commits nothing, and closes/parks nothing
+//                               stops the loop — its rerun would be identical.
 //   Phase 4 (Merge):            The orchestrator itself merges each mergeable
 //                               branch into the current branch — a script, not
 //                               an agent: merging and issue-closing are
@@ -73,6 +82,9 @@ type PipelineResult = {
   implementComplete: boolean;
   reviewApproved: boolean;
   checksPassed: boolean;
+  // The implementer proved the acceptance criteria are already met by
+  // existing code — the orchestrator closes the issue instead of gating it.
+  alreadySatisfied?: boolean;
   note?: string;
 };
 
@@ -98,13 +110,17 @@ const ARCHITECT_VERDICTS = {
   blocked: "<design>BLOCKED</design>",
 } as const;
 
-// The implementer's two exits: COMPLETE (acceptance criteria met, checks
-// green, work committed) or NEEDS_ARCHITECT (the design collided with
+// The implementer's three exits: COMPLETE (acceptance criteria met, checks
+// green, work committed), NEEDS_ARCHITECT (the design collided with
 // reality — punt back to the architect next cycle instead of letting the
-// cheaper model improvise a redesign).
+// cheaper model improvise a redesign), or ALREADY_SATISFIED (the criteria
+// are already met by existing code, nothing to implement — the orchestrator
+// closes the issue; without this exit a no-op issue livelocks: COMPLETE with
+// zero commits can never become ahead of base, so it is re-selected forever).
 const IMPLEMENT_SIGNALS = {
   complete: "<promise>COMPLETE</promise>",
   needsArchitect: "<promise>NEEDS_ARCHITECT</promise>",
+  alreadySatisfied: "<promise>ALREADY_SATISFIED</promise>",
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -219,6 +235,32 @@ function branchIsAheadOfBase(branch: string): boolean {
   }
 }
 
+// How many issues the planner would even see. plan-prompt.md interpolates this
+// same query at prompt-build time; asking first from the script means a
+// drained backlog costs one `gh` call instead of an opus planner run — the
+// model was previously invoked even on an empty `[]` list.
+function readyForAgentCount(): number {
+  const out = execFileSync(
+    "gh",
+    [
+      "issue",
+      "list",
+      "--state",
+      "open",
+      "--label",
+      "ready-for-agent",
+      "--limit",
+      "100",
+      "--json",
+      "number",
+      "--jq",
+      "length",
+    ],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+  ).trim();
+  return Number(out) || 0;
+}
+
 // ---------------------------------------------------------------------------
 // Main loop
 // ---------------------------------------------------------------------------
@@ -227,6 +269,11 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   console.log(`\n=== Iteration ${iteration}/${MAX_ITERATIONS} ===\n`);
 
   assertRepoNotMidMerge();
+
+  if (readyForAgentCount() === 0) {
+    console.log("No open ready-for-agent issues — nothing to plan. Exiting.");
+    break;
+  }
 
   // -------------------------------------------------------------------------
   // Phase 1: Plan
@@ -355,8 +402,27 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
           completionSignal: [
             IMPLEMENT_SIGNALS.complete,
             IMPLEMENT_SIGNALS.needsArchitect,
+            IMPLEMENT_SIGNALS.alreadySatisfied,
           ],
         });
+
+        if (
+          implement.completionSignal === IMPLEMENT_SIGNALS.alreadySatisfied
+        ) {
+          // Nothing to implement — the criteria are met by existing code (the
+          // implementer left evidence as an issue comment). Skip the reviewer
+          // and verifier: there is no diff to review. The orchestrator closes
+          // the issue after the pipelines settle.
+          return {
+            issue,
+            commits: implement.commits,
+            implementComplete: false,
+            reviewApproved: false,
+            checksPassed: false,
+            alreadySatisfied: true,
+            note: "acceptance criteria already met by existing code (see issue comment)",
+          };
+        }
 
         const implementComplete =
           implement.completionSignal === IMPLEMENT_SIGNALS.complete;
@@ -451,6 +517,33 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     outcome.status === "fulfilled" ? [outcome.value] : [],
   );
 
+  // Issues the implementer proved already satisfied get closed here on the
+  // host, like merge+close below: deterministic code, not a prompt
+  // instruction. Closing is cycle progress — the next planner query no
+  // longer sees the issue.
+  const alreadySatisfied = results.filter((r) => r.alreadySatisfied);
+  for (const { issue } of alreadySatisfied) {
+    try {
+      execFileSync(
+        "gh",
+        [
+          "issue",
+          "close",
+          issue.id,
+          "--comment",
+          "Closed by Sandcastle: acceptance criteria already met by existing code — evidence in the comments above.",
+        ],
+        { stdio: "pipe" },
+      );
+      console.log(`  ✓ #${issue.id} closed — already satisfied`);
+    } catch {
+      console.error(
+        `  ⚠ #${issue.id} reported already-satisfied but could NOT be ` +
+          `closed — close it manually: gh issue close ${issue.id}`,
+      );
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Phase 3: Gate
   //
@@ -471,8 +564,11 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // that produced no commits at all (an implementer that burned its iteration
   // budget without committing, or an architect that blocked the issue) so no
   // stuck issue goes unnoticed in the cycle summary.
-  const heldBack = results.filter((r) => !mergeable.includes(r));
+  const heldBack = results.filter(
+    (r) => !mergeable.includes(r) && !r.alreadySatisfied,
+  );
 
+  let parked = 0;
   for (const r of heldBack) {
     const reasons =
       r.note ??
@@ -487,6 +583,52 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       ? " — branch kept for the next cycle"
       : "";
     console.log(`  ⏸ ${r.issue.branch} held back (${reasons})${suffix}`);
+
+    // COMPLETE with nothing on the branch is the livelock signature: the
+    // branch can never become ahead of base, so the gate will hold it back on
+    // every future cycle too (the issue-22 failure mode — a parent/no-op
+    // issue). ALREADY_SATISFIED is the well-behaved exit for that situation;
+    // this is the backstop when the implementer says COMPLETE instead. Park
+    // the issue for a human: swap ready-for-agent for needs-triage so the
+    // planner's label filter stops selecting it.
+    if (r.implementComplete && !branchIsAheadOfBase(r.issue.branch)) {
+      try {
+        execFileSync(
+          "gh",
+          [
+            "issue",
+            "edit",
+            r.issue.id,
+            "--remove-label",
+            "ready-for-agent",
+            "--add-label",
+            "needs-triage",
+          ],
+          { stdio: "pipe" },
+        );
+        execFileSync(
+          "gh",
+          [
+            "issue",
+            "comment",
+            r.issue.id,
+            "--body",
+            "Parked by Sandcastle: the implementer signaled COMPLETE but produced no commits and the branch has no work to merge — likely already satisfied by existing code (possibly via child issues) or mis-specified. A human should close or re-spec it; re-add `ready-for-agent` to hand it back to the agents.",
+          ],
+          { stdio: "pipe" },
+        );
+        parked++;
+        console.log(
+          `  ⏸ #${r.issue.id} parked (ready-for-agent → needs-triage) — COMPLETE with no work to merge`,
+        );
+      } catch {
+        console.error(
+          `  ⚠ #${r.issue.id} should be parked but the label swap failed — ` +
+            `do it manually (create the label first if missing): ` +
+            `gh issue edit ${r.issue.id} --remove-label ready-for-agent --add-label needs-triage`,
+        );
+      }
+    }
   }
 
   console.log(
@@ -497,6 +639,25 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   }
 
   if (mergeable.length === 0) {
+    // Did this cycle change anything the next cycle would see? New commits
+    // resume on held-back branches; closed or parked issues leave the planner
+    // query. If none of that happened, the next cycle's inputs are identical
+    // to this one's — iterating again would replay the exact same cycle
+    // (agents are the only nondeterminism, and burning tokens on a coin flip
+    // is not a strategy). Stop loudly instead.
+    const cycleMadeProgress =
+      results.some((r) => r.commits.length > 0) ||
+      alreadySatisfied.length > 0 ||
+      parked > 0;
+    if (!cycleMadeProgress) {
+      console.log(
+        "Stopping: cycle made no progress — nothing merged, no new commits, " +
+          "no issues closed or parked. The next cycle's inputs would be " +
+          "identical; see the held-back reasons above and resolve them " +
+          "before re-running.",
+      );
+      break;
+    }
     // All agents ran but nothing passed the gate — nothing to merge this
     // cycle. Held-back branches resume next iteration.
     console.log("No branches passed the gate. Nothing to merge.");

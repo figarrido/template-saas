@@ -256,7 +256,7 @@ GitHub Issues on `figarrido/template-saas` (via `gh`); external PRs are also a t
 
 ### Triage labels
 
-Canonical defaults — `needs-triage` / `needs-info` / `ready-for-agent` / `ready-for-human` / `wontfix`. See `docs/agents/triage-labels.md`.
+Canonical defaults — `needs-triage` / `needs-info` / `ready-for-agent` / `ready-for-human` / `wontfix` — plus repo-specific `tracking` for parent/spec issues whose work lands via children (never combined with `ready-for-agent`). See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
