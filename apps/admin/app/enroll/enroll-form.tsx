@@ -21,18 +21,28 @@ import { confirmEnrollmentAction } from '@/lib/actions/mfa';
 const enrollSchema = z.object({ code: z.string().min(6, 'Enter the 6-digit code') });
 type Values = z.infer<typeof enrollSchema>;
 
-type Props = {
+type Enrollment = {
   factorId: string;
   qrCode: string;
   secret: string;
 };
 
-export function EnrollForm({ factorId, qrCode, secret }: Props) {
+type Props = {
+  // null once the Operator is already enrolled (e.g. the post-verify
+  // revalidation, or revisiting /enroll after setup): no new factor to confirm.
+  enrollment: Enrollment | null;
+};
+
+export function EnrollForm({ enrollment }: Props) {
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
   const form = useZodForm(enrollSchema);
 
   async function onSubmit(values: Values) {
-    const result = await confirmEnrollmentAction({ factorId, code: values.code });
+    if (!enrollment) return;
+    const result = await confirmEnrollmentAction({
+      factorId: enrollment.factorId,
+      code: values.code,
+    });
     if (!result.ok) {
       toast.error(result.error);
       return;
@@ -63,6 +73,22 @@ export function EnrollForm({ factorId, qrCode, secret }: Props) {
     );
   }
 
+  if (!enrollment) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Authenticator ready</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <p className="text-sm text-muted-foreground">Your authenticator is set up.</p>
+          <Link href="/" className="w-full">
+            <Button className="w-full">Continue to backoffice</Button>
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -73,9 +99,9 @@ export function EnrollForm({ factorId, qrCode, secret }: Props) {
           Scan the QR code with your authenticator app, or enter the secret manually.
         </p>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={qrCode} alt="TOTP QR code" className="mx-auto" />
+        <img src={enrollment.qrCode} alt="TOTP QR code" className="mx-auto" />
         <p className="text-xs text-muted-foreground text-center">
-          Manual entry: <code className="font-mono">{secret}</code>
+          Manual entry: <code className="font-mono">{enrollment.secret}</code>
         </p>
         <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <Field>
