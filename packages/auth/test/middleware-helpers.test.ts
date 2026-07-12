@@ -7,8 +7,8 @@ import {
 
 describe('readActiveOrgFromCookie', () => {
   it('accepts a uuid', () => {
-    expect(readActiveOrgFromCookie('33333333-3333-3333-3333-333333333333')).toBe(
-      '33333333-3333-3333-3333-333333333333',
+    expect(readActiveOrgFromCookie('33333333-3333-7333-8333-333333333333')).toBe(
+      '33333333-3333-7333-8333-333333333333',
     );
   });
   it('rejects garbage', () => {

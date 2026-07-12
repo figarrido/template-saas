@@ -33,7 +33,7 @@ insert into auth.users (
 ) values
   (
     '00000000-0000-0000-0000-000000000000',
-    '11111111-1111-1111-1111-111111111111',
+    '11111111-1111-7111-8111-111111111111',
     'authenticated',
     'authenticated',
     'admin@template.test',
@@ -50,7 +50,7 @@ insert into auth.users (
   ),
   (
     '00000000-0000-0000-0000-000000000000',
-    '22222222-2222-2222-2222-222222222222',
+    '22222222-2222-7222-8222-222222222222',
     'authenticated',
     'authenticated',
     'user@template.test',
@@ -70,30 +70,30 @@ on conflict (id) do nothing;
 -- Grant admin status to the admin user.
 insert into public.admin_users (user_id, granted_by, notes)
 values (
-  '11111111-1111-1111-1111-111111111111',
-  '11111111-1111-1111-1111-111111111111',
+  '11111111-1111-7111-8111-111111111111',
+  '11111111-1111-7111-8111-111111111111',
   'Seeded admin'
 )
 on conflict (user_id) do nothing;
 
 -- One organization with both users as members.
 insert into public.organizations (organization_id, name, slug) values (
-  '33333333-3333-3333-3333-333333333333',
+  '33333333-3333-7333-8333-333333333333',
   'Template Org',
   'template-org'
 )
 on conflict (organization_id) do nothing;
 
 insert into public.memberships (user_id, organization_id, role) values
-  ('11111111-1111-1111-1111-111111111111',
-   '33333333-3333-3333-3333-333333333333', 'owner'),
-  ('22222222-2222-2222-2222-222222222222',
-   '33333333-3333-3333-3333-333333333333', 'member')
+  ('11111111-1111-7111-8111-111111111111',
+   '33333333-3333-7333-8333-333333333333', 'owner'),
+  ('22222222-2222-7222-8222-222222222222',
+   '33333333-3333-7333-8333-333333333333', 'member')
 on conflict (user_id, organization_id) do nothing;
 
 -- One plan + entitlement so packages/billing.entitlements.has() returns true.
 insert into public.plans (plan_id, slug, name, description) values (
-  '44444444-4444-4444-4444-444444444444',
+  '44444444-4444-7444-8444-444444444444',
   'pro',
   'Pro',
   'Reference paid tier wired through the Stripe adapter.'
@@ -103,9 +103,9 @@ on conflict (plan_id) do nothing;
 insert into public.entitlements (
   entitlement_id, organization_id, plan_id, key, value, source
 ) values (
-  '55555555-5555-5555-5555-555555555555',
-  '33333333-3333-3333-3333-333333333333',
-  '44444444-4444-4444-4444-444444444444',
+  '55555555-5555-7555-8555-555555555555',
+  '33333333-3333-7333-8333-333333333333',
+  '44444444-4444-7444-8444-444444444444',
   'pro',
   'true'::jsonb,
   'seed'
@@ -115,7 +115,7 @@ on conflict (entitlement_id) do nothing;
 -- Map the Pro plan to its entitlement key(s). plan_entitlements is
 -- developer-defined product config (ADR 0007).
 insert into public.plan_entitlements (plan_id, key, value) values (
-  '44444444-4444-4444-4444-444444444444',
+  '44444444-4444-7444-8444-444444444444',
   'pro',
   'true'::jsonb
 )
