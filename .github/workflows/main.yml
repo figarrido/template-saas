@@ -96,10 +96,18 @@ jobs:
       - run: pnpm -F @template/auth test:integration
       - run: pnpm -F @template/billing test:integration
       - run: pnpm -F @template/admin test:integration
-      # Free :3000 so the E2E Playwright webServer can bind its own prod server.
+      # Free :3000 for the E2E Playwright webServer. `pnpm dev` spawns a child
+      # `next` process that keeps the port bound after the wrapper PID is killed,
+      # so kill by port (fuser) and confirm the socket is released before build.
       - name: Stop web app
         if: always()
-        run: kill "$(cat "$RUNNER_TEMP/web.pid")" 2>/dev/null || true
+        run: |
+          kill "$(cat "$RUNNER_TEMP/web.pid")" 2>/dev/null || true
+          for _ in $(seq 1 10); do
+            fuser -k 3000/tcp 2>/dev/null || true
+            fuser 3000/tcp >/dev/null 2>&1 || break
+            sleep 1
+          done
       - run: pnpm build
         env:
           # Supply local-dev Supabase defaults so apps/admin env validation
