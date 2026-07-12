@@ -248,7 +248,7 @@ A queryable tree-sitter graph of the codebase (built with [graphify](https://git
 
 ## Agent skills
 
-Per-repo configuration the engineering skills (`to-issues`, `triage`, `to-prd`, `qa`, `improve-codebase-architecture`, `diagnosing-bugs`, `tdd`) read.
+Per-repo configuration the engineering skills (`to-tickets`, `triage`, `to-spec`, `qa`, `improve-codebase-architecture`, `diagnosing-bugs`, `tdd`) read.
 
 ### Issue tracker
 
@@ -256,7 +256,7 @@ GitHub Issues on `figarrido/template-saas` (via `gh`); external PRs are also a t
 
 ### Triage labels
 
-Canonical defaults — `needs-triage` / `needs-info` / `ready-for-agent` / `ready-for-human` / `wontfix`. See `docs/agents/triage-labels.md`.
+Canonical defaults — `needs-triage` / `needs-info` / `ready-for-agent` / `ready-for-human` / `wontfix` — plus repo-specific `tracking` for parent/spec issues whose work lands via children (never combined with `ready-for-agent`). See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
