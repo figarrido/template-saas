@@ -54,9 +54,52 @@ jobs:
           echo "WORKER_DATABASE_URL=$DB_URL" >> $GITHUB_ENV
           echo "ADMIN_DATABASE_URL=$DB_URL" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SITE_URL=http://localhost:3001" >> $GITHUB_ENV
+      # The auth integration suite drives real GoTrue sign-up / email-change,
+      # and GoTrue POSTs the confirmation mail to the send_email hook
+      # (supabase/config.toml → host.docker.internal:3000/api/auth/hooks/send-email),
+      # served by apps/web. Unlike ci.yml — which has no E2E and simply disables
+      # the hook — this job's later Playwright step needs the hook live, so we
+      # bring the endpoint up instead of toggling config: boot the web dev server
+      # (mirrors `pnpm dev`, the setup these specs were written against), wait for
+      # :3000, and warm the hook route so GoTrue's first call doesn't race a cold
+      # compile. The env mirrors the E2E step's block so the app boots identically.
+      - name: Start web app for the send_email hook
+        env:
+          SUPABASE_URL: 'http://127.0.0.1:54421'
+          NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54421'
+          SUPABASE_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+          ADMIN_DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:54422/postgres'
+          NEXT_PUBLIC_SITE_URL: 'http://localhost:3000'
+          STRIPE_SECRET_KEY: 'sk_test_placeholder'
+          STRIPE_WEBHOOK_SECRET: 'whsec_placeholder'
+          MAIL_PROVIDER: 'smtp'
+          SMTP_HOST: '127.0.0.1'
+          SMTP_PORT: '54425'
+        run: |
+          pnpm -F @template/web dev > "$RUNNER_TEMP/web-dev.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/web.pid"
+          # A signature-less POST returns 401 once the route is compiled; poll
+          # until the endpoint answers (misses are fast connection-refused).
+          for i in $(seq 1 120); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+              -X POST http://localhost:3000/api/auth/hooks/send-email || true)
+            if [ "$code" != "000" ]; then
+              echo "send_email hook responding (HTTP $code) after ${i} attempt(s)"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::apps/web did not come up on :3000 in time"
+          cat "$RUNNER_TEMP/web-dev.log" || true
+          exit 1
       - run: pnpm -F @template/auth test:integration
       - run: pnpm -F @template/billing test:integration
       - run: pnpm -F @template/admin test:integration
+      # Free :3000 so the E2E Playwright webServer can bind its own prod server.
+      - name: Stop web app
+        if: always()
+        run: kill "$(cat "$RUNNER_TEMP/web.pid")" 2>/dev/null || true
       - run: pnpm build
         env:
           # Supply local-dev Supabase defaults so apps/admin env validation
