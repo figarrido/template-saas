@@ -82,7 +82,10 @@ test.describe('Operator MFA', () => {
     await page.waitForURL('**/');
     await expect(page.locator('h1')).toContainText('Admin');
 
-    // Sign out, sign in again, and attempt the same recovery code.
+    // Sign out (clear the session), sign in again, and attempt the same
+    // recovery code. Without clearing cookies the operator is still aal2, so
+    // /login would redirect to / and there would be no form to fill.
+    await page.context().clearCookies();
     await page.goto('/login');
     await page.fill('input[type="email"]', 'admin@template.test');
     await page.fill('input[type="password"]', 'password');
