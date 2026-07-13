@@ -36,6 +36,6 @@ Output your plan as a JSON object wrapped in `<plan>` tags:
 
 Include only unblocked issues, ordered most-important-first: put issues that unblock the most other issues (or carry the highest priority labels) at the top. The orchestrator caps how many run in parallel and takes them from the top of your list.
 
-If every issue is blocked, include the single highest-priority candidate (the one with the fewest or weakest dependencies).
+If every issue is blocked, do NOT pick one anyway. An issue whose blocker is still open gets stranded: the merge gate holds its branch until the blocker lands, and the implementer burns its entire iteration budget re-confirming the blocker. Emit an empty plan instead, and before the `<plan>` tags name the bottleneck issue(s) a human must unstick. Exception: two ready issues that block only each other through file overlap are an ordering decision, not a block — surface the higher-leverage one as usual.
 
 Always emit the `<plan>` tags, even when there is nothing to do. If there are no issues to work on at all, output `<plan>{"issues": []}</plan>` so the run can exit cleanly.
