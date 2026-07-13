@@ -86,7 +86,9 @@ Output <promise>NEEDS_ARCHITECT</promise> when the design cannot be executed as 
 
 Output <promise>ALREADY_SATISFIED</promise> when the issue's acceptance criteria are already met by the code as it stands and there is nothing left to implement — typically a parent/tracking issue whose work landed through child issues, or work that another branch already delivered. Verify, don't assume: run the checks or tests that prove each acceptance criterion. Then leave a comment on the issue citing the evidence (the files, the tests, the commands you ran and their results) so a human can audit the claim, and emit the signal — the orchestrator will close the issue. Never use this signal in a run where you changed or committed anything; that is COMPLETE.
 
-If neither applies — the work is simply unfinished — end WITHOUT any signal; the loop will run you again and you can continue.
+Output <promise>BLOCKED</promise> when an acceptance criterion cannot be met yet because it depends on another open issue or on infrastructure this sandbox does not have — the design is sound and the remaining work is real, but nothing you can do here will finish it. Commit any safe partial work first. Then, unless an existing comment already reports this exact blocker, leave ONE comment naming the blocking issue and precisely what must land before work can resume. Emit the signal immediately — do not spend iterations re-checking a blocker that only another issue or a human can clear, and never post repeat status comments about the same blocker.
+
+If none of these apply — the work is simply unfinished and you can still make progress here — end WITHOUT any signal; the loop will run you again and you can continue.
 
 # FINAL RULES
 

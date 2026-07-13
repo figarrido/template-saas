@@ -13,9 +13,11 @@
 //                               the code (via the graphify code graph built in
 //                               the sandbox hook) and posts a design to the
 //                               issue; a sonnet implementer executes that
-//                               design (up to 100 iterations), with a
-//                               NEEDS_ARCHITECT escape signal for when the
-//                               design collides with reality. If it commits
+//                               design (up to 100 iterations), with escape
+//                               signals for when the design collides with
+//                               reality (NEEDS_ARCHITECT) or the work waits
+//                               on another open issue or missing
+//                               infrastructure (BLOCKED). If it commits
 //                               and signals COMPLETE, an opus reviewer emits
 //                               an APPROVE/REQUEST_CHANGES verdict, then a
 //                               cheap verifier re-runs typecheck + tests and
@@ -129,17 +131,23 @@ const ARCHITECT_VERDICTS = {
   blocked: "<design>BLOCKED</design>",
 } as const;
 
-// The implementer's three exits: COMPLETE (acceptance criteria met, checks
+// The implementer's four exits: COMPLETE (acceptance criteria met, checks
 // green, work committed), NEEDS_ARCHITECT (the design collided with
 // reality — punt back to the architect next cycle instead of letting the
-// cheaper model improvise a redesign), or ALREADY_SATISFIED (the criteria
+// cheaper model improvise a redesign), ALREADY_SATISFIED (the criteria
 // are already met by existing code, nothing to implement — the orchestrator
 // closes the issue; without this exit a no-op issue livelocks: COMPLETE with
-// zero commits can never become ahead of base, so it is re-selected forever).
+// zero commits can never become ahead of base, so it is re-selected forever),
+// or BLOCKED (an acceptance criterion depends on another open issue or on
+// infrastructure the sandbox lacks — without this exit a blocked issue spins
+// the whole iteration budget re-confirming its blocker, posting a status
+// comment per iteration; observed: 84 near-identical "still blocked"
+// comments and ~100 wasted implementer runs on one issue).
 const IMPLEMENT_SIGNALS = {
   complete: "<promise>COMPLETE</promise>",
   needsArchitect: "<promise>NEEDS_ARCHITECT</promise>",
   alreadySatisfied: "<promise>ALREADY_SATISFIED</promise>",
+  blocked: "<promise>BLOCKED</promise>",
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -641,6 +649,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
             IMPLEMENT_SIGNALS.complete,
             IMPLEMENT_SIGNALS.needsArchitect,
             IMPLEMENT_SIGNALS.alreadySatisfied,
+            IMPLEMENT_SIGNALS.blocked,
           ],
         });
 
@@ -662,6 +671,28 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
             alreadySatisfied: true,
             tokens,
             note: "acceptance criteria already met by existing code (see issue comment)",
+          };
+        }
+
+        if (implement.completionSignal === IMPLEMENT_SIGNALS.blocked) {
+          // An acceptance criterion waits on another open issue or on
+          // infrastructure the sandbox doesn't have — the design is fine,
+          // the work is just not executable yet (the implementer left a
+          // comment naming the blocker). Skip the reviewer and verifier;
+          // partial commits survive on the branch for the cycle that runs
+          // after the blocker clears. Deliberately NOT exempted from the
+          // attempt accounting below: plan-prompt.md tells the planner not
+          // to select blocked issues, so a re-selection that ends BLOCKED
+          // again is a planner misjudgment — MAX_ATTEMPTS such cycles park
+          // the issue for a human instead of looping forever.
+          return {
+            issue,
+            commits: implement.commits,
+            implementComplete: false,
+            reviewApproved: false,
+            checksPassed: false,
+            tokens,
+            note: "implementer blocked by another open issue or missing infrastructure (see issue comment)",
           };
         }
 
