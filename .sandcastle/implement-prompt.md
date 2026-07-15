@@ -12,9 +12,9 @@ Only work on the issue specified.
 
 # BRANCH
 
-Work on branch {{BRANCH}}. It may already contain partial work from a previous cycle: check `git log {{TARGET_BRANCH}}..HEAD --oneline` first, and if there are commits, continue from where they left off instead of starting over.
+Work on branch {{BRANCH}}. It may already contain partial work from a previous cycle: check `git log {{BASE_BRANCH}}..HEAD --oneline` first, and if there are commits, continue from where they left off instead of starting over.
 
-Then sync with the target branch: if `git log HEAD..{{TARGET_BRANCH}} --oneline` shows commits, run `git merge {{TARGET_BRANCH}} --no-edit`, resolve any conflicts, and confirm `pnpm typecheck` passes on the merge result before continuing. A finished branch that sits on a stale base gets stuck at the merge phase — sync early, while you can still run the tests.
+Then sync with the base branch: if `git log HEAD..{{BASE_BRANCH}} --oneline` shows commits, run `git merge {{BASE_BRANCH}} --no-edit`, resolve any conflicts, and confirm `pnpm typecheck` passes on the merge result before continuing. A finished branch that sits on a stale base gets stuck at the merge phase — sync early, while you can still run the tests.
 
 # CONTEXT
 
