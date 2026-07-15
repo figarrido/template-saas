@@ -8,9 +8,13 @@ export default {
   out: './src/drizzle',
   dialect: 'postgresql',
   dbCredentials: {
+    // Schema tooling connects as the OWNER, not the app_service runtime role:
+    // introspection must see every object in `public`, and app_service is
+    // deliberately scoped to DML on the app's own tables. `SUPABASE_DB_URL` is
+    // an optional owner override (e.g. to introspect a remote DB); the default
+    // is the local owner connection.
     url:
-      process.env.WORKER_DATABASE_URL ??
-      process.env.ADMIN_DATABASE_URL ??
+      process.env.SUPABASE_DB_URL ??
       'postgresql://postgres:postgres@127.0.0.1:54422/postgres',
   },
   // Public schema only. drizzle-kit chokes on some Supabase-internal auth

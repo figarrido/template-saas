@@ -17,9 +17,11 @@ const committedRelations = resolve(pkgRoot, 'src', 'drizzle', 'relations.ts');
 const tmp = mkdtempSync(resolve(tmpdir(), 'drizzle-drift-'));
 const configPath = resolve(tmp, 'drizzle.config.ts');
 
+// Introspection connects as the OWNER, not the app_service runtime role: it
+// must see every object in `public`, whereas app_service is scoped to DML on
+// the app's own tables and could report false drift. Mirrors drizzle.config.ts.
 const dbUrl =
-  process.env.WORKER_DATABASE_URL ??
-  process.env.ADMIN_DATABASE_URL ??
+  process.env.SUPABASE_DB_URL ??
   'postgresql://postgres:postgres@127.0.0.1:54422/postgres';
 
 writeFileSync(

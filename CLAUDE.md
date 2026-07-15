@@ -81,7 +81,7 @@ middleware.ts  auth, active-org, CSP nonce, rate-limit
 ### Data access — RLS is structural
 
 - **`apps/web` uses `getUserClient(req)`** (supabase-js, RLS-honoring). Never service-role.
-- **`apps/admin` and `services/*` use `getServiceClient()`** (Drizzle + service role) for cross-org queries.
+- **`apps/admin` and `services/*` use `getServiceClient()`** (Drizzle as the scoped `app_service` role — `BYPASSRLS`, DML-only, not the `postgres` owner; see [02-data.md](docs/architecture/02-data.md) § Query layer) for cross-org queries.
 - **ESLint forbids importing `getServiceClient` from `apps/web/**`.** If you propose code there that needs cross-org access, you're doing it wrong — push the operation behind an RPC or a worker job.
 - All org-scoped tables carry `organization_id`. RLS policies key on `auth.uid()` + `memberships`.
 

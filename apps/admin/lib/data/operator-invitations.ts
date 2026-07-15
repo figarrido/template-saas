@@ -11,8 +11,10 @@ import { lookupAdminStatus } from './admin';
 import { writeAdminAudit } from './audit';
 
 async function findUserIdByEmail(email: string): Promise<string | null> {
+  // Reads auth.users email via the private.user_emails view — app_service has no
+  // auth-schema grant (see supabase/migrations/*_app_service_role.sql).
   const rows = (await getAdminDb().execute(
-    sql`select id from auth.users where lower(email) = ${email} limit 1`,
+    sql`select id from private.user_emails where lower(email) = ${email} limit 1`,
   )) as unknown as Array<{ id: string }>;
   return rows[0]?.id ?? null;
 }

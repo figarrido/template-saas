@@ -113,13 +113,19 @@ jobs:
       - name: Export Supabase keys for integration tests
         run: |
           eval "$(supabase status -o env)"
+          # Runtime suites (billing/admin) connect as the scoped app_service role,
+          # as apps/admin + services/* do in prod; the auth suite needs the owner
+          # (it does auth.users DML) and reads SUPABASE_DB_URL. $DB_URL is the
+          # owner connection; swap its userinfo for app_service + seed password.
+          APP_DB_URL="${DB_URL/postgres:postgres@/app_service:postgres@}"
           echo "SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY" >> $GITHUB_ENV
           echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "SUPABASE_URL=$API_URL" >> $GITHUB_ENV
-          echo "WORKER_DATABASE_URL=$DB_URL" >> $GITHUB_ENV
-          echo "ADMIN_DATABASE_URL=$DB_URL" >> $GITHUB_ENV
+          echo "SUPABASE_DB_URL=$DB_URL" >> $GITHUB_ENV
+          echo "WORKER_DATABASE_URL=$APP_DB_URL" >> $GITHUB_ENV
+          echo "ADMIN_DATABASE_URL=$APP_DB_URL" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SITE_URL=http://localhost:3001" >> $GITHUB_ENV
       - run: pnpm -F @template/auth test:integration
       - run: pnpm -F @template/billing test:integration

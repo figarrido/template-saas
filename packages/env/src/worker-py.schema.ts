@@ -17,14 +17,15 @@ export const workerPySchema: SurfaceSchema = {
   server: workerPyServer,
   examples: {
     ...sharedExamples,
-    WORKER_DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:54422/postgres',
+    WORKER_DATABASE_URL: 'postgresql://app_service:postgres@127.0.0.1:54422/postgres',
     WORKER_HEALTH_PORT: '8082',
     WORKER_QUEUES: 'data',
     SHUTDOWN_GRACE_SECONDS: '30',
   },
   descriptions: {
     ...sharedDescriptions,
-    WORKER_DATABASE_URL: 'Direct Postgres connection used by the Python worker.',
+    WORKER_DATABASE_URL:
+      'Direct Postgres connection for the Python worker. Connect as the scoped `app_service` role (BYPASSRLS, DML-only) — never the `postgres` owner. See docs/recipes/secret-rotation.md.',
     WORKER_HEALTH_PORT: 'Port for `GET /health`.',
     WORKER_QUEUES: 'Comma-separated pgmq queue names this worker subscribes to.',
     SHUTDOWN_GRACE_SECONDS: 'SIGTERM drain window before forced exit.',

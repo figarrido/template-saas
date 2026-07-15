@@ -31,7 +31,7 @@ export const adminSchema: SurfaceSchema = {
   client: adminClient,
   examples: {
     ...sharedExamples,
-    ADMIN_DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:54422/postgres',
+    ADMIN_DATABASE_URL: 'postgresql://app_service:postgres@127.0.0.1:54422/postgres',
     MAIL_PROVIDER: 'smtp',
     SMTP_HOST: '127.0.0.1',
     SMTP_PORT: '54425',
@@ -40,7 +40,8 @@ export const adminSchema: SurfaceSchema = {
   },
   descriptions: {
     ...sharedDescriptions,
-    ADMIN_DATABASE_URL: 'Direct Postgres connection used by Drizzle. Service-role only.',
+    ADMIN_DATABASE_URL:
+      'Direct Postgres connection for Drizzle. Connect as the scoped `app_service` role (BYPASSRLS, DML-only) — never the `postgres` owner. See docs/recipes/secret-rotation.md.',
     MAIL_PROVIDER: '`smtp` in dev, `resend` in prod.',
     NEXT_PUBLIC_SITE_URL: 'Admin origin (separate from web).',
     OPERATOR_EMAIL_FROM: 'From: address for Operator invitation emails.',

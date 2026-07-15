@@ -13,9 +13,12 @@ import {
 // Supabase stack; gated on `migration-validation` in CI alongside the RLS
 // suite and auth integration tests (packages/auth/vitest.integration.config.ts).
 
+// Exercises the entitlements read API as the runtime `app_service` role
+// (BYPASSRLS, DML-only) so CI proves that role's grants suffice — billing runs
+// this way in admin/workers. Local fallback uses app_service's seed password.
 const DATABASE_URL =
   process.env.WORKER_DATABASE_URL ??
-  'postgresql://postgres:postgres@127.0.0.1:54422/postgres';
+  'postgresql://app_service:postgres@127.0.0.1:54422/postgres';
 
 const serviceSql = postgres(DATABASE_URL, { max: 4, prepare: false });
 

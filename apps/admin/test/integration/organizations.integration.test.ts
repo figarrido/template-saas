@@ -7,9 +7,12 @@ import { listOrganizations, getOrganizationDetail, listActivePlans } from '../..
 // Supabase stack; gated on `migration-validation` in CI alongside the
 // billing integration suite.
 
+// Exercises the admin data layer as the runtime `app_service` role (BYPASSRLS,
+// DML-only) so CI proves that role's grants suffice — apps/admin connects this
+// way in production. Local fallback uses app_service's seed password.
 const DATABASE_URL =
   process.env.WORKER_DATABASE_URL ??
-  'postgresql://postgres:postgres@127.0.0.1:54422/postgres';
+  'postgresql://app_service:postgres@127.0.0.1:54422/postgres';
 
 const serviceSql = postgres(DATABASE_URL, { max: 4, prepare: false });
 
