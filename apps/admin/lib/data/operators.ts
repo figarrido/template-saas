@@ -13,8 +13,10 @@ export type OperatorRow = {
   revokedAt: string | null;
 };
 
-/** All Operators, active and revoked. Email comes from auth.users (not modeled
- *  in Drizzle), so this uses raw SQL — same approach as findUserIdByEmail. */
+/** All Operators, active and revoked. Email comes from auth.users, read through
+ *  the private.user_emails view because app_service has no auth-schema grant
+ *  (see supabase/migrations/*_app_service_role.sql). Raw SQL — email is not
+ *  modeled in Drizzle — same approach as findUserIdByEmail. */
 export async function listOperators(db: ServiceClient): Promise<OperatorRow[]> {
   const rows = (await db.execute(sql`
     select
@@ -23,7 +25,7 @@ export async function listOperators(db: ServiceClient): Promise<OperatorRow[]> {
       au.granted_at as "grantedAt",
       au.revoked_at as "revokedAt"
     from public.admin_users au
-    join auth.users u on u.id = au.user_id
+    join private.user_emails u on u.id = au.user_id
     order by (au.revoked_at is null) desc, au.granted_at desc
   `)) as unknown as Array<{
     userId: string;

@@ -24,8 +24,12 @@ export const SUPABASE_PUBLISHABLE_KEY =
 export const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
 
+// Fixture bootstrap does direct DML on auth.users (createAuthUser below), which
+// the scoped app_service runtime role intentionally cannot do. So this harness
+// connects as the OWNER via SUPABASE_DB_URL — NOT WORKER_DATABASE_URL, which now
+// points at app_service.
 export const DATABASE_URL =
-  process.env.WORKER_DATABASE_URL ??
+  process.env.SUPABASE_DB_URL ??
   'postgresql://postgres:postgres@127.0.0.1:54422/postgres';
 
 export const serviceSql = postgres(DATABASE_URL, { max: 4, prepare: false });

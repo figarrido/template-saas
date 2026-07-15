@@ -10,13 +10,19 @@ export type ServiceClientConfig = {
 let cached: ReturnType<typeof drizzle<typeof schema>> | undefined;
 
 /**
- * Service-role Drizzle client. Bypasses RLS by design.
+ * Cross-tenant Drizzle client. Bypasses RLS by design.
+ *
+ * `databaseUrl` must connect as the scoped `app_service` role (BYPASSRLS,
+ * DML-only, no DDL/ownership) — see supabase/migrations/*_app_service_role.sql
+ * and docs/architecture/02-data.md § Query layer — NOT the `postgres` owner and
+ * NOT the service-role JWT (that key is a PostgREST concept and cannot back a
+ * Postgres connection). The role bypasses RLS the same way the owner did, but
+ * cannot drop tables, alter roles, or disable RLS if a call site is compromised.
  *
  * Use only from `apps/admin`, `services/*`, server-side webhooks, and worker
  * jobs that legitimately operate across tenants. The shared ESLint preset
  * (`@template/config/eslint/next`) exports `banServiceClient` so consumer
- * apps can refuse imports — apps/web MUST opt in to that rule. See
- * docs/architecture/02-data.md § Query layer.
+ * apps can refuse imports — apps/web MUST opt in to that rule.
  *
  * @server-only
  */

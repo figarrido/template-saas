@@ -10,6 +10,13 @@
 -- Deliberately small. Add factories in derived projects if richer fixtures
 -- are needed for tests.
 
+-- Local-only password for the app_service runtime role (created without one in
+-- 20260715000001_app_service_role.sql). seed.sql runs on `supabase db reset` and
+-- never against hosted, so this throwaway cred stays local -- same convention as
+-- the 'password' auth users below. Production/staging set the real password
+-- out-of-band; see docs/recipes/secret-rotation.md.
+alter role app_service with password 'postgres';
+
 -- Insert auth users directly. The on_auth_user_created trigger mirrors them
 -- into public.profiles, so we don't insert into profiles here.
 -- Password for both is "password" (test only). Generated via:

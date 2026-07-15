@@ -24,24 +24,29 @@ Data model sketch:
 
 ## Query layer
 
-**Decision:** Hybrid. `supabase-js` in `apps/web` (user-context, RLS-honoring). Drizzle with a service-role Postgres connection in `apps/admin` and `services/*` (cross-org, complex queries). Types generated from the live schema.
+**Decision:** Hybrid. `supabase-js` in `apps/web` (user-context, RLS-honoring). Drizzle over a raw Postgres connection as the dedicated **`app_service`** role in `apps/admin` and `services/*` (cross-org, complex queries). Types generated from the live schema.
 
 **`packages/db` shape:**
 - Exports two named factories — `getUserClient(req)` and `getServiceClient()` — so the security boundary is visible at every call site.
 - ESLint rule (in `packages/config/eslint/next.js`, see [11-config](./11-config.md)) forbids importing `getServiceClient` from `apps/web/**`. Bypassing RLS in the client app is a tooling-level error, not a code-review hope.
+- `getServiceClient` connects as **`app_service`** — a `LOGIN BYPASSRLS` role scoped to DML on `public` + `pgmq` with no DDL/ownership ([`supabase/migrations/*_app_service_role.sql`](../../supabase/migrations)). It bypasses RLS exactly as connecting as the owner did, but a compromised admin/worker path cannot drop tables, alter roles, or turn RLS off. It is **not** the `postgres` owner, and **not** the service-role JWT — that key is a PostgREST concept and cannot back a Postgres DSN. The role's password is provisioned per environment and lives only in `ADMIN_DATABASE_URL` / `WORKER_DATABASE_URL`; see [recipes/secret-rotation.md](../recipes/secret-rotation.md).
+- Schema tooling (migrations via the Supabase CLI, `drizzle-kit introspect`) still runs as the **owner** — introspection must see every object in `public`, which the scoped role deliberately can't guarantee. The owner connection is `SUPABASE_DB_URL` (defaults to the local owner DSN).
 - Both clients consume the same generated `database.types.ts` (`supabase gen types --linked`). Drizzle's schema is introspected from the live DB (`drizzle-kit introspect`).
 - CI check fails if either type source has drifted from what's committed.
 
 **Why:**
 - Honoring RLS structurally (not by convention) is the highest-leverage decision in this stack. The factory names make the security boundary visible at every call site.
 - Admin and worker queries are legitimately cross-org and complex; supabase-js would push call sites into raw RPCs or PostgREST contortions.
+- The one client that deliberately bypasses RLS should hold the *least* other privilege. `app_service` bounds a compromised admin/worker path to DML instead of shipping DDL/superuser-adjacent power in every service deploy.
 
 **Tradeoffs:**
 - Two clients to maintain. Engineers need to know which to use where — mitigated by the linter and factory names.
 - Connection pooling splits: `apps/web` via PostgREST (Supabase-managed); admin/workers via Supabase's transaction-mode pooler / PgBouncer.
+- `app_service` needs a password, provisioned per environment and rotated manually (coordinated single-role rotation). See [recipes/secret-rotation.md](../recipes/secret-rotation.md); zero-downtime A/B rotation is documented there as the upgrade for when continuous uptime demands it.
+- A service-only table added later needs no hand-grant (the migration grants `app_service` on future `public`/`pgmq` objects via default privileges), but a table in a *new schema* does — grant `app_service` explicitly there.
 - Schema drift risk between the two TS type sources. CI check catches it before merge.
 
-**Related:** [09-api-boundary](./09-api-boundary.md), [11-config](./11-config.md)
+**Related:** [09-api-boundary](./09-api-boundary.md), [11-config](./11-config.md), [recipes/secret-rotation.md](../recipes/secret-rotation.md)
 
 ---
 

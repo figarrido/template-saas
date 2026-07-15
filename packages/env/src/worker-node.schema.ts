@@ -17,14 +17,15 @@ export const workerNodeSchema: SurfaceSchema = {
   server: workerNodeServer,
   examples: {
     ...sharedExamples,
-    WORKER_DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:54422/postgres',
+    WORKER_DATABASE_URL: 'postgresql://app_service:postgres@127.0.0.1:54422/postgres',
     WORKER_HEALTH_PORT: '8081',
     WORKER_QUEUES: 'default,emails,billing',
     SHUTDOWN_GRACE_SECONDS: '30',
   },
   descriptions: {
     ...sharedDescriptions,
-    WORKER_DATABASE_URL: 'Direct Postgres connection used by Drizzle in workers.',
+    WORKER_DATABASE_URL:
+      'Direct Postgres connection for Drizzle in workers. Connect as the scoped `app_service` role (BYPASSRLS, DML-only) — never the `postgres` owner. See docs/recipes/secret-rotation.md.',
     WORKER_HEALTH_PORT: 'Port for `GET /health`. Required by Railway.',
     WORKER_QUEUES: 'Comma-separated pgmq queue names this worker subscribes to.',
     SHUTDOWN_GRACE_SECONDS: 'SIGTERM drain window before forced exit.',

@@ -46,13 +46,19 @@ jobs:
       - name: Export Supabase keys for integration tests
         run: |
           eval "$(pnpm exec supabase status -o env)"
+          # Runtime suites (billing/admin) + the E2E admin app connect as the
+          # scoped app_service role, as prod does; the auth suite needs the owner
+          # (auth.users DML) via SUPABASE_DB_URL. Swap $DB_URL's userinfo for
+          # app_service + its seed password.
+          APP_DB_URL="${DB_URL/postgres:postgres@/app_service:postgres@}"
           echo "SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY" >> $GITHUB_ENV
           echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> $GITHUB_ENV
           echo "SUPABASE_URL=$API_URL" >> $GITHUB_ENV
-          echo "WORKER_DATABASE_URL=$DB_URL" >> $GITHUB_ENV
-          echo "ADMIN_DATABASE_URL=$DB_URL" >> $GITHUB_ENV
+          echo "SUPABASE_DB_URL=$DB_URL" >> $GITHUB_ENV
+          echo "WORKER_DATABASE_URL=$APP_DB_URL" >> $GITHUB_ENV
+          echo "ADMIN_DATABASE_URL=$APP_DB_URL" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_SITE_URL=http://localhost:3001" >> $GITHUB_ENV
       # The auth integration suite drives real GoTrue sign-up / email-change,
       # and GoTrue POSTs the confirmation mail to the send_email hook
@@ -69,7 +75,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54421'
           SUPABASE_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
-          ADMIN_DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:54422/postgres'
+          ADMIN_DATABASE_URL: 'postgresql://app_service:postgres@127.0.0.1:54422/postgres'
           NEXT_PUBLIC_SITE_URL: 'http://localhost:3000'
           STRIPE_SECRET_KEY: 'sk_test_placeholder'
           STRIPE_WEBHOOK_SECRET: 'whsec_placeholder'
@@ -119,7 +125,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54421'
           SUPABASE_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
-          ADMIN_DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:54422/postgres'
+          ADMIN_DATABASE_URL: 'postgresql://app_service:postgres@127.0.0.1:54422/postgres'
           NEXT_PUBLIC_SITE_URL: 'http://localhost:3001'
           STRIPE_SECRET_KEY: 'sk_test_placeholder'
           STRIPE_WEBHOOK_SECRET: 'whsec_placeholder'
@@ -130,7 +136,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54421'
           SUPABASE_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
-          ADMIN_DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:54422/postgres'
+          ADMIN_DATABASE_URL: 'postgresql://app_service:postgres@127.0.0.1:54422/postgres'
           NEXT_PUBLIC_SITE_URL: 'http://localhost:3000'
           STRIPE_SECRET_KEY: 'sk_test_placeholder'
           STRIPE_WEBHOOK_SECRET: 'whsec_placeholder'

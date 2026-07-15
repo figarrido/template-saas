@@ -123,7 +123,13 @@ function writeEnvLocal(target: Target, supabase: Map<string, string>, hookSecret
     } else if (v.name === 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY') {
       value = supabase.get('PUBLISHABLE_KEY') ?? '';
     } else if (v.name === 'WORKER_DATABASE_URL' || v.name === 'ADMIN_DATABASE_URL') {
-      value = supabase.get('DB_URL') ?? '';
+      // Drizzle connects as the scoped `app_service` role, not the `postgres`
+      // owner that `supabase status` reports in DB_URL. Swap the userinfo for
+      // app_service + its local seed password (supabase/seed.sql).
+      value = (supabase.get('DB_URL') ?? '').replace(
+        /:\/\/[^@/]+@/,
+        '://app_service:postgres@',
+      );
     } else if (v.name === 'SMTP_HOST') {
       value = '127.0.0.1';
     } else if (v.name === 'SMTP_PORT') {

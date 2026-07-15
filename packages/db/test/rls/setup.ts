@@ -1,9 +1,12 @@
 import postgres from 'postgres';
 
-// Service-role connection. Bypasses RLS — used to set up fixtures and to
-// confirm cross-tenant denial would be visible to admin tools.
+// Privileged OWNER connection for this harness. It seeds fixtures, confirms
+// cross-tenant rows are visible to a BYPASSRLS connection (as admin tools are),
+// and — critically — does `set local role authenticated` in asUser(), which the
+// scoped app_service role cannot (it's not a member of authenticated). So this
+// uses the owner via SUPABASE_DB_URL, not WORKER_DATABASE_URL (app_service).
 export const serviceSql = postgres(
-  process.env.WORKER_DATABASE_URL ??
+  process.env.SUPABASE_DB_URL ??
     'postgresql://postgres:postgres@127.0.0.1:54422/postgres',
   { max: 4, prepare: false },
 );
