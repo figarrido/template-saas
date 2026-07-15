@@ -10,7 +10,7 @@ Pull in the issue and its discussion: `gh issue view {{TASK_ID}} --comments`. If
 
 # RESUMED WORK
 
-You are on branch {{BRANCH}}, which may contain work from a previous cycle — check `git log {{TARGET_BRANCH}}..HEAD --oneline`.
+You are on branch {{BRANCH}}, which may contain work from a previous cycle — check `git log {{BASE_BRANCH}}..HEAD --oneline`.
 
 Look for a previous design comment on the issue (it starts with `<!-- sandcastle:design -->`):
 

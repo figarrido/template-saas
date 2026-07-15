@@ -2,7 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    # spec/** branches are Sandcastle's per-spec integration branches: child
+    # PRs target them, and the orchestrator merges only on a green fast gate.
+    branches: [main, 'spec/**']
 
 # Per-PR fast gate. docs/architecture/08-platform.md § CI specifics:
 # "PR feedback under ~3 min for the inner loop; full suite on merge avoids

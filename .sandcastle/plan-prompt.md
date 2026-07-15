@@ -12,6 +12,8 @@ The list above has already been filtered to issues ready for work.
 
 # TASK
 
+{{SPEC_NOTE}}
+
 Analyze the open issues and build a dependency graph. For each issue, determine whether it **blocks** or **is blocked by** any other open issue.
 
 You have the repository checked out. When it is unclear whether two issues touch the same files or modules, inspect the code to find out instead of guessing.
@@ -26,12 +28,14 @@ An issue is **unblocked** if it has zero blocking dependencies on other open iss
 
 For each unblocked issue, assign a branch name using the exact format `sandcastle/issue-{id}` (no slug or other suffix). This must be deterministic so that re-planning the same issue always produces the same branch name and accumulated progress is preserved.
 
+For each issue, also write a `prTitle`: the Conventional Commits title for its pull request — one of `feat|fix|chore|docs|refactor|perf|test|build|ci|revert`, optional `(scope)`, and a subject that starts lowercase (e.g. `feat: grant and revoke comps`). The repo's pr-title check enforces this format, and the title becomes the squash-commit subject when the branch merges — describe the change itself, not the process.
+
 # OUTPUT
 
 Output your plan as a JSON object wrapped in `<plan>` tags:
 
 <plan>
-{"issues": [{"id": "42", "title": "Fix auth bug", "branch": "sandcastle/issue-42"}]}
+{"issues": [{"id": "42", "title": "Fix auth bug", "prTitle": "fix: correct token refresh on expiry", "branch": "sandcastle/issue-42"}]}
 </plan>
 
 Include only unblocked issues, ordered most-important-first: put issues that unblock the most other issues (or carry the highest priority labels) at the top. The orchestrator caps how many run in parallel and takes them from the top of your list.

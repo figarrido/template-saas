@@ -16,8 +16,12 @@ These are the defaults — the role name equals the label string. `wontfix` is a
 
 ## Repo-specific labels
 
-| Label      | Meaning                                                        |
-| ---------- | -------------------------------------------------------------- |
-| `tracking` | Parent/umbrella issue (a spec or epic) whose work lands through child issues |
+| Label       | Meaning                                                        |
+| ----------- | -------------------------------------------------------------- |
+| `tracking`  | Parent/umbrella issue (a spec or epic) whose work lands through child issues |
+| `wip`       | On a spec→main PR: Sandcastle is still landing child issues into the spec branch |
+| `in-review` | Awaiting the human: a green PR to merge, or an issue whose PR waits on that merge |
 
-`tracking` is never combined with `ready-for-agent`: there is nothing to implement on the issue itself, and an agent that selects it will livelock — it produces no commits, so its branch can never pass the merge gate, and the planner re-selects it every cycle. When breaking a spec into tickets, label the parent `tracking` and give `ready-for-agent` only to the child tickets that carry implementable work. Close a `tracking` issue when all of its children are closed.
+`tracking` is never combined with `ready-for-agent`: there is nothing to implement on the issue itself, and an agent that selects it will livelock — it produces no commits, so its branch can never pass the merge gate, and the planner re-selects it every cycle. When breaking a spec into tickets, label the parent `tracking` and give `ready-for-agent` only to the child tickets that carry implementable work. A `tracking` issue closes automatically when its spec PR lands on main (the PR body carries `Closes #<n>`).
+
+`wip` and `in-review` are managed by the Sandcastle orchestrator and are label-based on purpose — GitHub draft PRs are paywalled on private repos, and this flow is synced across several of them. The human's queue is `label:in-review` (across PRs and issues); everything labeled `wip` is still in flight. Sandcastle swaps `ready-for-agent` → `in-review` on an issue when its PR to main goes green and awaits a human merge; closing such a PR without merging leaves the issue parked until a human re-adds `ready-for-agent`.
