@@ -102,10 +102,31 @@ function ShowCard({
 // ─── nav items ───────────────────────────────────────────────────────────────
 
 const NAV = [
+  { href: '#foundations', label: 'Foundations' },
   { href: '#states', label: 'State coverage' },
   { href: '#atoms', label: 'Atoms' },
   { href: '#molecules', label: 'Molecules' },
   { href: '#organisms', label: 'Organisms' },
+];
+
+// ─── foundations data ────────────────────────────────────────────────────────
+
+const SWATCHES: { label: string; className: string; text: string }[] = [
+  { label: 'primary', className: 'bg-primary', text: 'text-primary-foreground' },
+  { label: 'secondary', className: 'bg-secondary', text: 'text-secondary-foreground' },
+  { label: 'muted', className: 'bg-muted', text: 'text-muted-foreground' },
+  { label: 'accent', className: 'bg-accent', text: 'text-accent-foreground' },
+  { label: 'destructive', className: 'bg-destructive', text: 'text-destructive-foreground' },
+  { label: 'success', className: 'bg-success', text: 'text-success-foreground' },
+  { label: 'warning', className: 'bg-warning', text: 'text-warning-foreground' },
+  { label: 'card · border', className: 'bg-card border', text: 'text-card-foreground' },
+];
+
+const RADII: { label: string; className: string }[] = [
+  { label: 'sm', className: 'rounded-sm' },
+  { label: 'md · button', className: 'rounded-md' },
+  { label: 'lg · card', className: 'rounded-lg' },
+  { label: 'full', className: 'rounded-full' },
 ];
 
 // ─── page ────────────────────────────────────────────────────────────────────
@@ -144,6 +165,38 @@ export default function DesignSystemPage() {
             any page.
           </Text>
         </div>
+
+        {/* ── FOUNDATIONS ───────────────────────────────────────── */}
+        <Section id="foundations" label="Foundations">
+          <ShowCard title="Color · semantic tokens">
+            <p className="text-xs text-muted-foreground">
+              Derived from the root <code className="rounded bg-muted px-1 py-0.5">DESIGN.md</code>{' '}
+              (Notion reference). Swap that file and re-derive the tokens in{' '}
+              <code className="rounded bg-muted px-1 py-0.5">packages/ui/globals.css</code>.
+            </p>
+            <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4">
+              {SWATCHES.map((s) => (
+                <div
+                  key={s.label}
+                  className={`flex h-16 items-end rounded-md p-2 ${s.className} ${s.text}`}
+                >
+                  <span className="text-xs font-medium">{s.label}</span>
+                </div>
+              ))}
+            </div>
+          </ShowCard>
+
+          <ShowCard title="Radius · rounded scale">
+            <SubSection title="Border radius">
+              {RADII.map((r) => (
+                <div key={r.label} className="flex flex-col items-center gap-2">
+                  <div className={`h-14 w-14 border bg-secondary ${r.className}`} />
+                  <span className="text-xs text-muted-foreground">{r.label}</span>
+                </div>
+              ))}
+            </SubSection>
+          </ShowCard>
+        </Section>
 
         {/* ── STATE COVERAGE ────────────────────────────────────── */}
         <Section id="states" label="Component state coverage">
@@ -218,12 +271,12 @@ export default function DesignSystemPage() {
           </ShowCard>
 
           {/* Typography */}
-          <ShowCard title="Typography">
+          <ShowCard title="Typography · DESIGN.md scale">
             <div className="space-y-3">
-              <Heading as="h1" size="h1">Heading 1 — 36px</Heading>
-              <Heading as="h2" size="h2">Heading 2 — 30px</Heading>
-              <Heading as="h3" size="h3">Heading 3 — 24px</Heading>
-              <Heading as="h4" size="h4">Heading 4 — 20px</Heading>
+              <Heading as="h1" size="h1">Heading 1 — 48px</Heading>
+              <Heading as="h2" size="h2">Heading 2 — 36px</Heading>
+              <Heading as="h3" size="h3">Heading 3 — 28px</Heading>
+              <Heading as="h4" size="h4">Heading 4 — 22px</Heading>
               <Separator />
               <Text size="lg">Large text — 18px default colour</Text>
               <Text size="base">Base text — 16px default colour</Text>

@@ -2,13 +2,15 @@ import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../utils/cn.js';
 
-const headingVariants = cva('font-semibold tracking-tight', {
+// Sizes map to the named DESIGN.md type scale (see packages/config tailwind
+// preset). Each token carries its own size / line-height / letter-spacing.
+const headingVariants = cva('font-semibold', {
   variants: {
     size: {
-      h1: 'text-4xl',
-      h2: 'text-3xl',
-      h3: 'text-2xl',
-      h4: 'text-xl',
+      h1: 'text-h1',
+      h2: 'text-h2',
+      h3: 'text-h3',
+      h4: 'text-h4',
     },
   },
   defaultVariants: { size: 'h2' },

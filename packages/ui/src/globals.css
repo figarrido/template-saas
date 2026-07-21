@@ -1,50 +1,78 @@
 /* Design tokens + base layer for @template/ui. Tailwind itself is imported by
    each app's globals.css, which also points @config at that app's
-   tailwind.config.ts (theme preset + content globs). */
+   tailwind.config.ts (theme preset + content globs).
+
+   These tokens are the DERIVED OUTPUT of the design system defined in the root
+   DESIGN.md (the getdesign.md / DESIGN.md standard). The template ships Notion
+   as the neutral reference; a derived project replaces DESIGN.md and re-derives
+   these HSL triplets from its own tokens. See docs/architecture/07-frontend.md. */
 @layer base {
   :root {
+    /* canvas #ffffff */
     --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    /* ink #1a1a1a */
+    --foreground: 0 0% 10.2%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 0 0% 10.2%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.5rem;
+    --popover-foreground: 0 0% 10.2%;
+    /* primary — Notion purple #5645d4 */
+    --primary: 247 62.4% 55.1%;
+    --primary-foreground: 0 0% 100%;
+    /* surface #f6f5f4 / charcoal #37352f */
+    --secondary: 30 10% 96.1%;
+    --secondary-foreground: 45 7.8% 20%;
+    --muted: 30 10% 96.1%;
+    /* steel #787671 */
+    --muted-foreground: 43 3% 45.7%;
+    --accent: 30 10% 96.1%;
+    --accent-foreground: 45 7.8% 20%;
+    /* semantic-error #e03131 */
+    --destructive: 0 73.8% 53.5%;
+    --destructive-foreground: 0 0% 100%;
+    /* semantic-success #1aae39 */
+    --success: 133 74% 39.2%;
+    --success-foreground: 0 0% 100%;
+    /* semantic-warning #dd5b00 */
+    --warning: 25 100% 43.3%;
+    --warning-foreground: 0 0% 100%;
+    /* hairline #e5e3df */
+    --border: 40 10.3% 88.6%;
+    /* hairline-strong #c8c4be (inputs) */
+    --input: 36 8.3% 76.5%;
+    --ring: 247 62.4% 55.1%;
+    /* cards = rounded-lg = 12px per DESIGN.md {rounded.lg} */
+    --radius: 0.75rem;
   }
 
+  /* Dark palette is a Notion-style warm near-black derivation — DESIGN.md flags
+     dark tokens as a known gap, so these are chosen to keep AA contrast. */
   .dark {
-    --background: 240 10% 3.9%;
+    --background: 0 0% 9.8%;
     --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
+    --card: 0 0% 12.5%;
     --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
+    --popover: 0 0% 12.5%;
     --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
+    /* lightened purple #7c6df0 for contrast on dark */
+    --primary: 247 81.4% 68.4%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 16.5%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
+    --muted: 0 0% 16.5%;
+    /* stone #a4a097 */
+    --muted-foreground: 42 6.7% 61.8%;
+    --accent: 0 0% 16.5%;
     --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --destructive: 358 85.8% 64.1%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 133 58% 50%;
+    --success-foreground: 0 0% 100%;
+    --warning: 25 90% 55%;
+    --warning-foreground: 0 0% 100%;
+    --border: 0 0% 20%;
+    --input: 0 0% 22.7%;
+    --ring: 247 81.4% 68.4%;
   }
 
   /* Tailwind v4 defaults the border color to currentColor; restore the design
