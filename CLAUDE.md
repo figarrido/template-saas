@@ -160,6 +160,7 @@ middleware.ts  auth, active-org, CSP nonce, rate-limit
 `docs/architecture/07-frontend.md`.
 
 - **shadcn/ui** components copied into `packages/ui` (not npm-installed). Re-run `shadcn add` to update.
+- **Design system source of truth is the root `DESIGN.md`** (getdesign.md/DESIGN.md standard; Notion is the neutral *reference*, like Stripe for billing). Tokens in `packages/ui/src/globals.css` + `packages/config/tailwind/preset.ts` are its derived output. Derived projects replace `DESIGN.md` and re-derive; only the core token layer ships (not the navy/pastel brand layer). See `docs/architecture/07-frontend.md`.
 - Forms: **React Hook Form + Zod + Sonner**. Reuse the same Zod schema for client and Server Action validation.
 - Emails: **React Email**. Resend in prod, SMTP→InBucket in dev.
 - Theming: `next-themes`, default `prefers-color-scheme`, cookie-persisted (SSR-safe).

@@ -56,6 +56,28 @@
 
 ---
 
+## Design tokens (`DESIGN.md`)
+
+**Decision:** The design system is defined by a **root `DESIGN.md`** following the [getdesign.md / DESIGN.md standard](https://github.com/google-labs-code/design.md) — YAML token front matter + human-readable rationale. The template ships **Notion as the neutral reference** (the same posture as Stripe for billing: one concrete, widely-applicable reference, not a vendor lock). `DESIGN.md` is the source of truth; the CSS-variable tokens in `packages/ui/src/globals.css` and the Tailwind preset in `packages/config/tailwind/preset.ts` are its **derived output**.
+
+**Mechanics:**
+- shadcn HSL tokens (`--background`, `--primary`, `--border`, `--radius`, `--success`/`--warning`, …) in `packages/ui/src/globals.css` are computed from the `DESIGN.md` `colors` (light + a derived warm-dark palette — `DESIGN.md` flags dark values as a known gap).
+- The preset exposes a named type scale (`text-h1` … `text-body`) from `DESIGN.md` `typography`, the semantic color tokens, and `--radius` (cards = `rounded-lg` = 12px).
+- Font: `DESIGN.md` specifies Notion Sans (Inter-based); the template wires **Inter** via `next/font` (the distributable substitute) as `--font-sans` in both apps.
+- Only the **core** token layer ships. `DESIGN.md`'s decorative brand layer (navy hero band, pastel `card-tint-*`, brand color spectrum, product-specific button variants) is documented but intentionally not implemented.
+
+**Why:**
+- A machine-readable design contract lets an agent (or a derived project) re-skin the whole system by editing one file and re-deriving tokens, instead of hunting hard-coded colors.
+- Choosing the most neutral published reference keeps the template un-branded while still demonstrating the full token pipeline end-to-end (visible at `/design-system`).
+
+**Tradeoffs:**
+- A derived project must **replace `DESIGN.md` and re-derive** the two token files — a deliberate, one-time step, not automatic.
+- The shadcn 3-step radius scale can't express both 8px buttons and 12px cards exactly; buttons land at 10px (`rounded-md`). Accepted over forking every component.
+
+**Related:** [11-config](./11-config.md), [UI library](#ui-library), root `DESIGN.md`
+
+---
+
 ## Theming (dark mode)
 
 **Decision:** Wired toggle, **defaults to `prefers-color-scheme`**, choice persisted in a cookie (SSR-safe, no flash).

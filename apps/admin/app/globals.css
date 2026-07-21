@@ -3,3 +3,7 @@
 /* v4 no longer auto-loads tailwind.config.ts; load it for the theme preset
    (shared design tokens) and the content globs (app + packages/ui/src). */
 @config '../tailwind.config.ts';
+
+body {
+  font-family: var(--font-sans), Inter, system-ui, sans-serif;
+}
