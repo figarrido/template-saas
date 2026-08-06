@@ -1,0 +1,7 @@
+# Kiln target-repo config (decision 05). Read by @kiln/config; drives the
+# hosted orchestrator's plan -> route -> design/execute/review -> gate -> publish
+# loop against this repo. See figarrido/kiln for the orchestrator itself.
+typecheckCmd: pnpm typecheck
+testCmd: pnpm test
+readyLabel: ready-for-agent
+baseBranch: main
