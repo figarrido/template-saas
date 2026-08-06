@@ -10,6 +10,8 @@ A production-shaped, opinionated **SaaS template** — multi-tenant from day one
 
 > This is a **template**, not a product. Country-, jurisdiction-, and product-specific adapters live in derived projects against the template's interfaces — not here. Every concrete vendor shipped is weight every derived project carries, so the template ships **abstractions plus one reference implementation**, no more.
 
+This repo can also be run through [Kiln](https://github.com/figarrido/kiln), a cloud orchestrator that opens automated feature PRs against it.
+
 Every architectural decision is written down in [`docs/architecture/`](./docs/architecture/); [`CLAUDE.md`](./CLAUDE.md) is the working-notes orientation for AI-assisted sessions.
 
 ## Table of contents
